@@ -1,0 +1,10 @@
+*.txt
+*.sh
+.ipynb_checkpoints/*
+cache/*
+Conllus/*
+Data/*
+Parsed/*
+Texts/*
+trankit/*
+VRT/*
