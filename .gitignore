@@ -1,5 +1,6 @@
 *.txt
 *.sh
+*.gz
 .ipynb_checkpoints/*
 cache/*
 Conllus/*
