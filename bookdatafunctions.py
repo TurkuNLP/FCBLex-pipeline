@@ -110,55 +110,56 @@ def getLemmaFrequencies(sentences: dict) -> dict:
         lemma_freqs[key] = getLemmaFreq(sentences[key])
     return lemma_freqs
 
-#Return dataframe with lemmas in descending order (ignoring PUNCT and non alnums)
-def getLemmaFreq(df: pd.DataFrame) -> pd.DataFrame:
+def getOnlyAlnums(sentences: dict, column: str) -> dict:
     """
-    Function which takes in a pd.DataFrame (sentence data) and spits out a df which has lemmas and their freqs
-    Lemmas exclude PUNCT and non alnums
+    Function which takes in sentence data and cleans punctuation and other non-alnum characters
+    :param sentences:dict of form [book_name, pd.DataFrame], df is sentence data
+    :param column: name of the column which to clean (recommend 'text' or 'lemma')
+    :return: dict of the same form
     """
-    #Get rid of PUNCT
-    no_punct = df[df.upos != "PUNCT"].copy()
-    #Make all into strings
-    no_punct['lemma'] = no_punct['lemma'].apply(lambda x: str(x))
-    #Remove non-alnums
-    no_punct['lemma'] = no_punct['lemma'].apply(lambda x: ''.join(filter(str.isalnum, x)))
-    #Filter rows with nothing in them
-    no_punct = no_punct[no_punct.text != '']
-    #Return a pivot_table turned DataFrame that counts the occurances of each lemma and sorts them in descending order
-    return pd.DataFrame.pivot_table(no_punct, columns='lemma', aggfunc='size').sort_values(ascending=False).reset_index().rename(columns={0: "frequency"})
-
-#Get frequencies of words (not PUNCT, all to lowercase, and removed all non alnums)
-def getWordFrequencies(sentences: dict) -> dict:
-    """
-    Function which takes in a dict of sentence data and spits out a dict with dfs containng word frequencies of the books
-    Words exclude PUNCT and non alnums
-    """
-    word_freqs = {}
+    clean = {}
     for key in sentences:
         df = sentences[key]
         #Get rid of PUNCT
         no_punct = df[df.upos != "PUNCT"].copy()
         #Make words lowercase
-        no_punct['text'] = no_punct['text'].apply(lambda x: x.lower())
+        no_punct[column] = no_punct[column].apply(lambda x: x.lower())
         #Remove non-alnums
-        no_punct['text'] = no_punct['text'].apply(lambda x: ''.join(filter(str.isalnum, x)))
+        no_punct[column] = no_punct[column].apply(lambda x: ''.join(filter(str.isalnum, x)))
         #Filter rows with nothing in them
         no_punct = no_punct[no_punct.text != '']
+        clean[key] = no_punct
+    return clean
+
+#Return dataframe with lemmas in descending order (ignoring PUNCT and non alnums)
+def getLemmaFreq(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Function which takes in a pd.DataFrame (sentence data) and spits out a df which has lemmas and their freqs
+    """
+    #Return a pivot_table turned DataFrame that counts the occurances of each lemma and sorts them in descending order
+    return pd.DataFrame.pivot_table(df, columns='lemma', aggfunc='size').sort_values(ascending=False).reset_index().rename(columns={0: "frequency"})
+
+#Get frequencies of words (not PUNCT, all to lowercase, and removed all non alnums)
+def getWordFrequencies(sentences: dict) -> dict:
+    """
+    Function which takes in a dict of sentence data and spits out a dict with dfs containng word frequencies of the books
+    """
+    word_freqs = {}
+    for key in sentences:
+        df = sentences[key]
         #Map book_name to pivot table
-        word_freqs[key] = pd.DataFrame.pivot_table(no_punct, columns='text', aggfunc='size').sort_values(ascending=False).reset_index().rename(columns={0: "frequency"})
+        word_freqs[key] = pd.DataFrame.pivot_table(df, columns='text', aggfunc='size').sort_values(ascending=False).reset_index().rename(columns={0: "frequency"})
     return word_freqs
 
 
 def getWordAmounts(sentences: dict) -> dict:
     """
-    Get amount of non-PUNCT tokens in sentences
+    Get amount of tokens in sentences
     """
     word_amounts = {}
     for key in sentences:
         df = sentences[key]
-        #Get rid of PUNCT
-        no_punct = df[df.upos != "PUNCT"]
-        word_amounts[key] = len(no_punct)
+        word_amounts[key] = len(df)
     return word_amounts
 
 #Get PoS frequencies
@@ -355,6 +356,28 @@ def combineSubCorpsData(corps: list):
         return combined.groupby(combined.columns[0])[combined.columns[1]].sum().reset_index()
     else:
         return combined.groupby(level=0).sum().reset_index()
+    
+
+def getTypeTokenRatios(v: dict, word_amounts: dict) -> pd.Series:
+    """
+    Function which gets the type-token ratios of each book that's in the corpus
+    :param v:frequency data per book
+    :param word_amounts:token amounts per book
+    :return: pd.Series with book names being indexes and ttr being values 
+    """
+    names = []
+    ttrs = []
+    for key in word_amounts:
+        v_df = v[key]
+        #Get the number of unique entities in freq data
+        types = len(v_df)
+        #Get the number of token in book
+        tokens = word_amounts[key]
+        #Add ttr to lis
+        ttrs.append(types/tokens)
+        #Add key to list
+        names.append(key)
+    return pd.Series(ttrs, names)
     
 
 #Writing all data into one big xlsx-file
