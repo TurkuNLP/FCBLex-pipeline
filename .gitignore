@@ -3,10 +3,5 @@
 *.gz
 .ipynb_checkpoints/*
 cache/*
-Conllus/*
-Data/*
-Parsed/*
-Texts/*
 trankit/*
-VRT/*
 __pycache__
