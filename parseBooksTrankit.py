@@ -4,7 +4,7 @@ from trankit import Pipeline
 import os
 import numpy
 import json
-from natsort import natsorted
+from tqdm import tqdm
 
 
 
@@ -15,27 +15,27 @@ def main():
     """
     #Setups
     p = Pipeline('finnish')
+    #Show progress bar for books
+    with tqdm(range(len(os.listdir("Texts"))), desc="Parsing books...") as pbar:
+        #For each book
+        for file in os.listdir("Texts"):
+            #If a folder exists, we assume that that book has already been parsed
 
-    #For each book
-    for folder in os.listdir("Texts"):
-        #If a folder exists, we assume that that book has already been parsed
-
-        if os.path.exists("Parsed/"+folder+"_parsed.json"):
-            continue
-        #Combine all pages together into a book
-        text=""
-        #For each page
-        for page in natsorted(os.listdir("Texts/"+folder)):
-            with open("Texts/"+folder+"/"+page) as reader:
+            if os.path.exists("Parsed/"+file+"_parsed.json"):
+                print("Skipping...")
+                continue
+            text=""
+            with open("Texts/"+file, "r") as reader:
                 text=text+reader.read()
             reader.close()
-        #Start with parsing the book
-        with open("Parsed/"+folder+"_parsed.json", "w", encoding="utf-8") as fp:
-            #Parse text if text is not empty
-            if len(text)!=0:
-                data = p(text)
-                #Write results to file
-                json.dump(data, fp, ensure_ascii=False)
+            #Start with parsing the book
+            with open("Parsed/"+file+"_parsed.json", "w", encoding="utf-8") as fp:
+                #Parse text if text is not empty
+                if len(text)!=0:
+                    data = p(text)
+                    #Write results to file
+                    json.dump(data, fp, ensure_ascii=False)
+            pbar.update(1)
 
 if __name__ == "__main__":
     main()

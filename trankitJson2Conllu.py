@@ -11,6 +11,9 @@ def main():
     #JSON to CoNLLU
 
     for file in os.listdir("Parsed"):
+        #Don't do work if file already exists!
+        if os.path.exists("Conllus/"+file.replace(".json", ".conllu")):
+            continue
         with open("Parsed/"+file) as json_file:
             #Convert json to dict
             data = json.load(json_file)

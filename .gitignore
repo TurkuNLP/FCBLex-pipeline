@@ -1,5 +1,4 @@
 *.txt
-*.sh
 *.gz
 .ipynb_checkpoints/*
 cache/*
@@ -10,3 +9,4 @@ Data
 Parsed
 Texts
 VRT
+PDFs
