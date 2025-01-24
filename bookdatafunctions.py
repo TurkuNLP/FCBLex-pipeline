@@ -378,7 +378,61 @@ def getTypeTokenRatios(v: dict, word_amounts: dict) -> pd.Series:
         #Add key to list
         names.append(key)
     return pd.Series(ttrs, names)
-    
+
+def getZipfValues(l: int, f: pd.DataFrame) -> pd.Series:
+    """
+    Function for calculating the Zipf values of words/lemmas in a corpus
+    Zipf = ( (raw_freq + 1) / (Tokens per million + Types per million) )+3.0
+    :param l: total length of corpus (token amount)
+    :param f: df containing frequency data of words/lemmas for the corpus
+    :return: pd.DataFrame, where indexes are words/lemmas and values the Zipf values
+    """
+    indexes = list(f[f.columns[0]])
+    types_per_mil = len(indexes)/1000000
+    tokens_per_mil = l/1000000
+    zipfs = f[f.columns[1]]+1
+    zipfs = zipfs / (tokens_per_mil + types_per_mil)
+    zipfs = np.log10(zipfs)
+    zipfs = zipfs + 3.0
+    zipfs.index = indexes
+    return zipfs
+
+def cleanLemmas(sentences: dict) -> dict:
+    """
+    Function which takes in sentence data and cleans rows based on a number of filters on lemma forms to guarantee better quality data
+    Does get rid of PUNCT
+    :param sentences:dict of form [book_name, pd.DataFrame], df is sentence data
+    :return: dict of the same form, but better data
+    """
+    clean = {}
+    for key in sentences:
+        df = sentences[key]
+        no_punct = df.copy()
+
+        #Make words lowercase
+        no_punct['lemma'] = no_punct['lemma'].apply(lambda x: x.lower())
+        #First mask
+        #Remove lemmas which are not alnum or have '-' but no weird chars at start or end, length >1, has no ' ', and has no ','
+        m = no_punct.lemma.apply(lambda x: (x.isalnum() 
+                                            or (not x.isalnum() and '-' in x and x[0].isalnum() and x[len(x)-1].isalnum())
+                                            and len(x)>1 
+                                            and not ' ' in x
+                                            and not ',' in x))
+        filtered = no_punct[m]
+        #Second mask
+        #Remove lemmas that have the same character more than thrice consecutively at the start (Finnish doesn't work like this)
+        m_2 = no_punct.lemma.apply(lambda x: conseqChars(x)
+                                   and not (x.isnumeric() and len(x)>4)
+                                   )
+        filtered_2 = filtered[m_2] 
+        clean[key] = filtered_2
+    return clean
+
+def conseqChars(x: str):
+    if len(x)>2:
+        return not x[0]==x[1]==x[2]
+    else:
+        return True    
 
 #Writing all data into one big xlsx-file
 def writeDataToXlsx(name, f_words, f_lemmas, pos_freqs, lemma_DP, word_DP, lemma_CD, word_CD, avg_uniq_lens_df, avg_lens_df):

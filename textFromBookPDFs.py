@@ -33,7 +33,7 @@ def main():
             with open("Texts/"+book.replace(".pdf", ""), 'w', encoding='utf-8') as writer:
                 writer.write(text)
 
-        pbar.update(1)
+            pbar.update(1)
 
 
 if __name__ == "__main__":

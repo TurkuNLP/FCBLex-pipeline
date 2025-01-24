@@ -1,6 +1,7 @@
 *.txt
 *.gz
 .ipynb_checkpoints/*
+*.ipynb
 cache/*
 trankit/*
 __pycache__

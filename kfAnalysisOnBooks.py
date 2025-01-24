@@ -1,4 +1,7 @@
 import bookdatafunctions as bdf
+import pandas as pd
+import seaborn as sns
+import matplotlib
 
 books = bdf.initBooksFromConllus("Conllus")
 
@@ -18,3 +21,15 @@ ttrs_3 = bdf.getTypeTokenRatios(word_freqs_3, word_amounts_3)
 
 print(ttrs_2.mean())
 print(ttrs_3.mean())
+
+word_amounts = bdf.getWordAmounts(books)
+
+l = bdf.getL(word_amounts)
+
+f_lemma = bdf.getTotal(lemma_freqs)
+
+lemma_zipfs = bdf.getZipfValues(l, f_lemma)
+
+print(lemma_zipfs)
+
+ax = lemma_zipfs.plot.hist()
