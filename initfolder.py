@@ -17,6 +17,8 @@ def main():
         os.mkdir("VRT")
     if not os.path.exists("PDFs"):
         os.mkdir("PDFs")
+    if not os.path.exists("IMGs"):
+        os.mkdir("IMGs")
 
 if __name__ == "__main__":
     main()
