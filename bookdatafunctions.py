@@ -410,11 +410,12 @@ def cleanLemmas(sentences: dict) -> dict:
         no_punct = df.copy()
 
         #Make words lowercase
-        no_punct['lemma'] = no_punct['lemma'].apply(lambda x: x.lower())
+        no_punct['lemma'] = no_punct['lemma'].apply(lambda x: str(x).lower())
         #First mask
         #Remove lemmas which are not alnum or have '-' but no weird chars at start or end, length >1, has no ' ', and has no ','
         m = no_punct.lemma.apply(lambda x: (x.isalnum() 
                                             or (not x.isalnum() and '-' in x and x[0].isalnum() and x[len(x)-1].isalnum())
+                                            or (not x.isalnum() and '#' in x and x[0].isalnum() and x[len(x)-1].isalnum())
                                             and len(x)>1 
                                             and not ' ' in x
                                             and not ',' in x))

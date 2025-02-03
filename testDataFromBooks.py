@@ -3,6 +3,7 @@ import pandas as pd
 
 #Constants
 JSON_PATH = "Parsed"
+CONLLU_PATH = "Conllus"
 
 def main():
     
@@ -11,17 +12,17 @@ def main():
 
     #Move to working with just sentence data
     #Whole corpus
-    sentences = bdf.getTokenData(books)
+    sentences = bdf.initBooksFromConllus(CONLLU_PATH)
 
     #Subcorpora based on the target age groups
-    sentences_1 = bdf.getSubCorp(sentences, 1)
-    sentences_2 = bdf.getSubCorp(sentences, 2)
-    sentences_3 = bdf.getSubCorp(sentences, 3)
+    sentences_1 = bdf.cleanLemmas(bdf.getSubCorp(sentences, 1))
+    sentences_2 = bdf.cleanLemmas(bdf.getSubCorp(sentences, 2))
+    sentences_3 = bdf.cleanLemmas(bdf.getSubCorp(sentences, 3))
 
     #Versions of sentences for more meaningful data
-    sentences_no_punct_1 = bdf.getNoPunct(sentences_1)
-    sentences_no_punct_2 = bdf.getNoPunct(sentences_2)
-    sentences_no_punct_3 = bdf.getNoPunct(sentences_3)
+    sentences_no_punct_1 = bdf.cleanLemmas(sentences_1)
+    sentences_no_punct_2 = bdf.cleanLemmas(sentences_2)
+    sentences_no_punct_3 = bdf.cleanLemmas(sentences_3)
     sentences_no_punct = bdf.combineSubCorpDicts([sentences_no_punct_1, sentences_no_punct_2, sentences_no_punct_3])
 
     #Count lemma frequencies
