@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#sh rotateCameraImages.sh
-#python processImages.py
-#python pdfs2LayoutGoogleDocAI.py
-#python layout2Text.py
-#sh clean_text.sh
-python parseBooksTrankit.py
-python trankitJson2Conllu.py
+sh scripts/rotateCameraImages.sh
+python scripts/processImages.py
+python scripts/pdfs2LayoutGoogleDocAI.py
+python scripts/layout2Text.py
+sh scripts/clean_text.sh
+python scripts/parseBooksTrankit.py
+python scripts/trankitJson2Conllu.py
