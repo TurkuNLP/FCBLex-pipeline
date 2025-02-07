@@ -43,9 +43,9 @@ def main():
 
     #Just for interest's sake, info on how many tokens (non-punct) are in each book
 
-    word_amounts_1 = bdf.getWordAmounts(sentences_1)
-    word_amounts_2 = bdf.getWordAmounts(sentences_2)
-    word_amounts_3 = bdf.getWordAmounts(sentences_3)
+    word_amounts_1 = bdf.getTokenAmounts(sentences_1)
+    word_amounts_2 = bdf.getTokenAmounts(sentences_2)
+    word_amounts_3 = bdf.getTokenAmounts(sentences_3)
 
     word_amounts = bdf.combineSubCorpDicts([word_amounts_1, word_amounts_2, word_amounts_3])
 
@@ -162,10 +162,10 @@ def main():
     pos_freqs_corpus = bdf.getTotal(pos_freqs_per_book)
 
     #Commencing the writing part
-    bdf.writeDataToXlsx("Initial56_whole", f_words, f_lemmas, pos_freqs_corpus, lemma_DP, word_DP, lemma_CD, word_CD, avg_uniq_lens_df, avg_lens_df)
-    bdf.writeDataToXlsx("Initial56_1", f_words_1, f_lemmas_1, pos_freqs_1, lemma_DP_1, word_DP_1, lemma_CD_1, word_CD_1, avg_uniq_lens_df_1, avg_lens_df_1)
-    bdf.writeDataToXlsx("Initial56_2", f_words_2, f_lemmas_2, pos_freqs_2, lemma_DP_2, word_DP_2, lemma_CD_2, word_CD_2, avg_uniq_lens_df_2, avg_lens_df_2)
-    bdf.writeDataToXlsx("Initial56_3", f_words_3, f_lemmas_3, pos_freqs_3, lemma_DP_3, word_DP_3, lemma_CD_3, word_CD_3, avg_uniq_lens_df_3, avg_lens_df_3)
+    bdf.writeDataToXlsx("Whole_corpus", f_words, f_lemmas, pos_freqs_corpus, lemma_DP, word_DP, lemma_CD, word_CD, avg_uniq_lens_df, avg_lens_df)
+    bdf.writeDataToXlsx("Sub_corp_1", f_words_1, f_lemmas_1, pos_freqs_1, lemma_DP_1, word_DP_1, lemma_CD_1, word_CD_1, avg_uniq_lens_df_1, avg_lens_df_1)
+    bdf.writeDataToXlsx("Sub_corp_2", f_words_2, f_lemmas_2, pos_freqs_2, lemma_DP_2, word_DP_2, lemma_CD_2, word_CD_2, avg_uniq_lens_df_2, avg_lens_df_2)
+    bdf.writeDataToXlsx("Sub_corp_3", f_words_3, f_lemmas_3, pos_freqs_3, lemma_DP_3, word_DP_3, lemma_CD_3, word_CD_3, avg_uniq_lens_df_3, avg_lens_df_3)
 
 
 if __name__ == "__main__":

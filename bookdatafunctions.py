@@ -73,7 +73,7 @@ def getNoPunct(sentences: dict) -> dict:
     return no_punct
 
 #Function that takes in a dictionary of [book_name, conllu_dataframe] and returns a dictionary with [book_name, sentences_dataframe]
-def getTokenData(books: dict) -> dict:
+def getSentenceData(books: dict) -> dict:
     """
     Function which takes in a dict created by initBooks and spits out a version where DataFrames only contain sentences data (see CoNLLU file format for more info)
     :books: dict of form [book_name, pandas.DataFrame]
@@ -152,7 +152,7 @@ def getWordFrequencies(sentences: dict) -> dict:
     return word_freqs
 
 
-def getWordAmounts(sentences: dict) -> dict:
+def getTokenAmounts(sentences: dict) -> dict:
     """
     Get amount of tokens in sentences
     """
@@ -289,7 +289,7 @@ def getCD(v: dict):
 
 def getL(word_amounts: dict) -> int:
     """
-    Function for getting the total length of the corpus
+    Function for getting the total length of the corpus in terms of the number of words
     """
     l = 0
     for key in word_amounts:
@@ -434,6 +434,33 @@ def conseqChars(x: str):
         return not x[0]==x[1]==x[2]
     else:
         return True    
+
+def ignoreOtherAlphabets(sentences: dict) -> dict:
+    """
+    Function which takes in sentence data and cleans rows based on if words contain characters not in the Finnish alphabe (e.g. cyrillic)
+    :param sentences:dict of form [book_name, pd.DataFrame], df is sentence data
+    :return: dict of the same form, but better data
+    """
+    clean = {}
+    for key in sentences:
+        df = sentences[key]
+        no_punct = df.copy()
+
+        #Make words lowercase
+        no_punct['text'] = no_punct['text'].apply(lambda x: str(x).lower())
+        #First mask
+        #Remove words which are not in the Finnish alphabet
+        m = no_punct.text.apply(lambda x: (
+                len(x.encode("ascii", "ignore")) == len(x)
+                or x.find('ä') != -1
+                or x.find('ö') != -1 
+                or x.find('å') != -1
+            )
+        )
+        filtered = no_punct[m]
+        clean[key] = filtered
+    return clean
+
 
 #Writing all data into one big xlsx-file
 def writeDataToXlsx(name, f_words, f_lemmas, pos_freqs, lemma_DP, word_DP, lemma_CD, word_CD, avg_uniq_lens_df, avg_lens_df):

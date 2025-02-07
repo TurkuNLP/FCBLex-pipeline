@@ -7,15 +7,19 @@ import os
 from natsort import natsorted
 import time
 from tqdm import tqdm
+import json
 
 #Constants, switch up if need be
 MANUAL_SCAN = True
-img_folder = "IMGs"
-output_folder = "Texts"
-#Chiefly using 'image/jpeg', but switch to 'image/png' if need be (see https://cloud.google.com/document-ai/docs/file-types)
-mime_type = "image/png"
+doc_folder = "PDFs"
+output_folder = "Layouts"
+#We use PDFs (see https://cloud.google.com/document-ai/docs/file-types)
+mime_type = "application/pdf"
 #We use the program only to get text - see https://github.com/googleapis/google-cloud-python for inspiration if changing
 field_mask = "text"
+#Processor type is 'rc' since we want to use the Layout Analyzer
+processor_version = "rc"
+
 
 
 #Edited version of the code sample from https://github.com/GoogleCloudPlatform/python-docs-samples/blob/main/documentai/snippets/process_document_sample.py
@@ -24,6 +28,7 @@ def main(
     location: str,
     processor_id: str,
     mime_type: str,
+    processor_version: str,
     field_mask: Optional[str] = None,
     processor_version_id: Optional[str] = None,
 ) -> None:
@@ -31,28 +36,26 @@ def main(
 
     client = documentai.DocumentProcessorServiceClient(client_options=opts)
 
-    if processor_version_id:
-        name = client.processor_version_path(
-            project_id, location, processor_id, processor_version_id
-        )
-    else:
-        name = client.processor_path(project_id, location, processor_id)
-    with tqdm(range(len(os.listdir(img_folder))), desc="OCRing books...") as pbar:
+    name = client.processor_version_path(
+        project_id, location, processor_id, processor_version
+    )
+    with tqdm(range(len(os.listdir(doc_folder))), desc="OCRing books...") as pbar:
         #Fetch the images to be scanned
-        for book in os.listdir(img_folder):
-            output_path = output_folder+"/"+book+".txt"
+        for book in os.listdir(doc_folder):
+            output_subdir = output_folder+"/"+book
             #Don't do unnecessary work if book has already been processed
-            if os.path.exists(output_path):
+            if os.path.exists(output_subdir):
                 pbar.update(1)
                 continue
+            else:
+                os.mkdir(output_subdir)
             
-            text = ""
-            with tqdm(range(len(os.listdir(img_folder+"/"+book))), desc="Processing pages...") as pbar2:
+            with tqdm(range(len(os.listdir(doc_folder+"/"+book))), desc="Processing pages...") as pbar2:
                 #Natsort the images so that we get the book in the correct order
-                for page in natsorted(os.listdir(img_folder+"/"+book)):
-                    page_path = img_folder+"/"+book+"/"+page
-                    #Load image to memory
-                    # Read the file into memory
+                for page in natsorted(os.listdir(doc_folder+"/"+book)):
+                    page_path = doc_folder+"/"+book+"/"+page
+                    output_path = output_subdir+"/"+page.replace(".pdf", ".json")
+                    #Load doc to memory
                     with open(page_path, "rb") as image:
                         image_content = image.read()
 
@@ -60,8 +63,14 @@ def main(
                     raw_document = documentai.RawDocument(content=image_content, mime_type=mime_type)
 
                     process_options = documentai.ProcessOptions(
-
+                        layout_config=documentai.ProcessOptions.LayoutConfig(
+                            chunking_config=documentai.ProcessOptions.LayoutConfig.ChunkingConfig(
+                                chunk_size=1000,
+                                include_ancestor_headings=True,
+                            )
+                        )
                     )
+
 
                     # Configure the process request
                     request = documentai.ProcessRequest(
@@ -75,15 +84,16 @@ def main(
 
                     document = result.document
 
-                    text += document.text
+                    jsonObj = documentai.Document.to_json(document)
+
+                    with open(output_path, "w", encoding="utf-8") as fp:
+                        #Parse text if text is not empty
+                        json.dump(jsonObj, fp, ensure_ascii=False)
 
                     pbar2.update(1)
                     #The count is maxxed out at 120 requests/min, so need to wait a bit in-between requests
                     #time.sleep(0.1)
 
-            #Write gotten text into a file!
-            with open(output_path, 'w', encoding='utf-8') as writer:
-                writer.write(text)
                 pbar.update(1)
 
 def getKeys(file_path: str = "docai") -> list:
@@ -98,4 +108,4 @@ def getKeys(file_path: str = "docai") -> list:
 
 if __name__ == "__main__":
     project_id, location, processor_id = getKeys()
-    main(project_id, location, processor_id, mime_type)
+    main(project_id, location, processor_id, mime_type, processor_version)

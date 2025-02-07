@@ -19,6 +19,8 @@ def main():
         os.mkdir("PDFs")
     if not os.path.exists("IMGs"):
         os.mkdir("IMGs")
+    if not os.path.exists("Layouts"):
+        os.mkdir("Layouts")
 
 if __name__ == "__main__":
     main()
