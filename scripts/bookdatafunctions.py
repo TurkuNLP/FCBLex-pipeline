@@ -142,7 +142,7 @@ def getLemmaFreq(df: pd.DataFrame) -> pd.DataFrame:
 #Get frequencies of words (not PUNCT, all to lowercase, and removed all non alnums)
 def getWordFrequencies(sentences: dict) -> dict:
     """
-    Function which takes in a dict of sentence data and spits out a dict with dfs containng word frequencies of the books
+    Function which takes in a dict of sentence data and spits out a dict with dfs containg word frequencies of the books
     """
     word_freqs = {}
     for key in sentences:
@@ -306,7 +306,7 @@ def getS(word_amounts: dict, l: int) -> dict:
     return s
 
 
-def getTotal(freq_data: dict) -> pd.DataFrame:
+def combineFrequencies(freq_data: dict) -> pd.DataFrame:
     """
     Get the total frequencies of passed freq_data in the corpus
     """
@@ -461,6 +461,17 @@ def ignoreOtherAlphabets(sentences: dict) -> dict:
         clean[key] = filtered
     return clean
 
+def getSharedWords(wordFrequencies1: dict, wordFrequencies2: dict) -> pd.DataFrame:
+    """
+    Gives a pd.DataFrame object where there are two columns: first contains those words/lemmas which are shared and the second their combined frequencies
+    """
+    sub1 = combineFrequencies(wordFrequencies1)
+    sub2 = combineFrequencies(wordFrequencies2)
+
+    shared = pd.concat([sub1, sub2], ignore_index=True)
+    mask = shared.duplicated(keep=False)
+    shared = shared[mask]
+    return shared.groupby(shared.columns[0])['frequency'].sum().reset_index()
 
 #Writing all data into one big xlsx-file
 def writeDataToXlsx(name, f_words, f_lemmas, pos_freqs, lemma_DP, word_DP, lemma_CD, word_CD, avg_uniq_lens_df, avg_lens_df):

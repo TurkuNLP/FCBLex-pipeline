@@ -26,7 +26,7 @@ word_amounts = bdf.getTokenAmounts(books)
 
 l = bdf.getL(word_amounts)
 
-f_lemma = bdf.getTotal(lemma_freqs)
+f_lemma = bdf.combineFrequencies(lemma_freqs)
 
 lemma_zipfs = bdf.getZipfValues(l, f_lemma)
 

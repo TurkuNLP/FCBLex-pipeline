@@ -106,15 +106,15 @@ def main():
     s_3 = bdf.getS(word_amounts_3, l_3)
     s = bdf.getS(word_amounts, l)
     #The overall frequencies of words in corpus
-    f_words_1 = bdf.getTotal(word_freqs_1)
-    f_words_2 = bdf.getTotal(word_freqs_2)
-    f_words_3 = bdf.getTotal(word_freqs_3)
-    f_words = bdf.getTotal(word_freqs)
+    f_words_1 = bdf.combineFrequencies(word_freqs_1)
+    f_words_2 = bdf.combineFrequencies(word_freqs_2)
+    f_words_3 = bdf.combineFrequencies(word_freqs_3)
+    f_words = bdf.combineFrequencies(word_freqs)
     #The overall frequencies of lemmas in corpus
-    f_lemmas_1 = bdf.getTotal(lemma_freqs_1)
-    f_lemmas_2 = bdf.getTotal(lemma_freqs_2)
-    f_lemmas_3 = bdf.getTotal(lemma_freqs_3)
-    f_lemmas = bdf.getTotal(lemma_freqs)
+    f_lemmas_1 = bdf.combineFrequencies(lemma_freqs_1)
+    f_lemmas_2 = bdf.combineFrequencies(lemma_freqs_2)
+    f_lemmas_3 = bdf.combineFrequencies(lemma_freqs_3)
+    f_lemmas = bdf.combineFrequencies(lemma_freqs)
     #The frequencies of words in each corpus part
     v_words = word_freqs
     #The frequencies of lemmas in each corpus part
@@ -155,11 +155,11 @@ def main():
 
     pos_freqs_per_book = bdf.getPOSFrequencies(sentences)
 
-    pos_freqs_1 = bdf.getTotal(bdf.getSubCorp(pos_freqs_per_book, 1))
-    pos_freqs_2 = bdf.getTotal(bdf.getSubCorp(pos_freqs_per_book, 2))
-    pos_freqs_3 = bdf.getTotal(bdf.getSubCorp(pos_freqs_per_book, 3))
+    pos_freqs_1 = bdf.combineFrequencies(bdf.getSubCorp(pos_freqs_per_book, 1))
+    pos_freqs_2 = bdf.combineFrequencies(bdf.getSubCorp(pos_freqs_per_book, 2))
+    pos_freqs_3 = bdf.combineFrequencies(bdf.getSubCorp(pos_freqs_per_book, 3))
 
-    pos_freqs_corpus = bdf.getTotal(pos_freqs_per_book)
+    pos_freqs_corpus = bdf.combineFrequencies(pos_freqs_per_book)
 
     #Commencing the writing part
     bdf.writeDataToXlsx("Whole_corpus", f_words, f_lemmas, pos_freqs_corpus, lemma_DP, word_DP, lemma_CD, word_CD, avg_uniq_lens_df, avg_lens_df)

@@ -10,7 +10,7 @@ if [ -d IMGs ] && [ -f docai ]; then
     python scripts/parseBooksTrankit.py
     python scripts/trankitJson2Conllu.py
 else
-    python scripts/initfolder.py
     echo "No folders found! Initiating folders!"
+    python scripts/initfolder.py
     echo "Remember to have your images in the IMGs folder in properly named sub-folders!"    
 fi
