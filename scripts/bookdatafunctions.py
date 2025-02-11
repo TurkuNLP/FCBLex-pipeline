@@ -433,7 +433,36 @@ def conseqChars(x: str):
     if len(x)>2:
         return not x[0]==x[1]==x[2]
     else:
-        return True    
+        return True
+    
+def cleanWordBeginnings(books: dict) -> dict:
+    """
+    Function for cleaning non-alnum characters from the beginning of words in sentence data
+    :param books: dict of the sentence data of books
+    :return: dictionary, where the dataframes have been cleaned
+    """
+    #Clean words
+    clean = {}
+    for key in books:
+        df = books[key].copy()
+        df['text'] = df['text'].apply(lambda x: delNonAlnumStart(x))
+        clean[key] = df
+    return clean
+
+def delNonAlnumStart(x: str) -> str:
+    '''
+    Function for deleting non-alnum sequences of words from Conllu-files
+    :param x: string that is at least 2 characters long
+    :return: the same string, but with non-alnum characters removed from the start until the first alnum-character
+    '''
+    if not x[0].isalnum() and len(x)>1:
+        ind = 0
+        for i in range(len(x)):
+            if x[i].isalnum():
+                ind=i
+                break
+        return x[ind:]
+    return x    
 
 def ignoreOtherAlphabets(sentences: dict) -> dict:
     """
