@@ -205,6 +205,21 @@ def getAvgLen(data: dict, column: str) -> dict:
             avg_lens[key] = total_len/(i-1.0)
     return avg_lens
 
+def getAvgSentenceLens(books: dict) -> dict:
+    """
+    Functon for gettign the average length of sentences in each book
+    :param books: dict of form [id, pd.DataFrame] like in the other methods
+    :return: dict of form [id, double], where the double is the average sentence length of the corresponding book
+    """
+    lens = {}
+    for key in books:
+        df = books[key]
+        help1 = len(df)
+        nums = df.id.value_counts()
+        num_of_sents = nums.iloc[0]
+        lens[key] = (help1/num_of_sents)
+    return lens
+
 #Function to calculate DP (deviation of proportions) of all the words in the corpus
 def getDP(v: dict, f_df: pd.DataFrame, s: dict) -> pd.DataFrame:
     """

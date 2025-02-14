@@ -7,8 +7,6 @@ if [ -d IMGs ] && [ -f docai ]; then
     python scripts/pdfs2LayoutGoogleDocAI.py
     python scripts/layout2Text.py
     sh scripts/clean_text.sh
-    python scripts/parseBooksTrankit.py
-    python scripts/trankitJson2Conllu.py
 else
     echo "No folders found! Initiating folders!"
     python scripts/initfolder.py
