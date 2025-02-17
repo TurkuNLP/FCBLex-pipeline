@@ -2,7 +2,6 @@
 
 if [ -d IMGs ] && [ -f docai ]; then
     echo "Starting pipeline..."
-    #sh scripts/rotateCameraImages.sh
     python scripts/processImages.py
     python scripts/pdfs2LayoutGoogleDocAI.py
     python scripts/layout2Text.py
