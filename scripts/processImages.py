@@ -16,6 +16,7 @@ IMG_FORMAT = ".JPG" #switch to png if needed
 
 def isPageColor(im, red_r: tuple, green_r: tuple, blue_r: tuple) -> bool:
     pix = im.load()
+
     color_counter = 0
     for y in range(1000, 2000):
         for x in range(1000, 2000):
@@ -37,45 +38,48 @@ def main():
                 os.mkdir(OUTPUT_FOLDER+"/"+book)
             #Natsorted files so that the images are correctly placed in the list
             files = natsorted(os.listdir(INPUT_FOLDER+"/"+book))
-
-            turn_index = 0
-            helper = 0
-            #Find the 'TURN' picture in the folder
-            for pic in files:
-                im = Image.open(INPUT_FOLDER+"/"+book+"/"+pic)
-                #Check for the blue 'TURN' page and break when it's found
-                if isPageColor(im, (60,80), (135,155), (135, 165)):
-                    turn_index = helper
-                    break
-                helper += 1
-
-            #Starting odd or even?
-            im = Image.open(INPUT_FOLDER+"/"+book+"/"+files[-1])
-            #Is the last page of the folder the green 'ODD/EVEN' page?
-            right_start = isPageColor(im, (125,145), (155,175), (90,115))
-            #Special cases when I type in manually
-            #right_start = True
-
-
             ordered_files = []
-            #Reorder the images and turn them appropriately
-            for i in range(0, turn_index):
-                if right_start:
-                    if len(files)-1*i-2 != turn_index:
-                        #Rotate turned pages
-                        p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[-1*i-2],'90'])
-                        p.communicate()
-                        ordered_files.append(files[-1*i-2])
-                    p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[i],'270'])
-                    ordered_files.append(files[i])
-                else:
-                    p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[i],'270'])
-                    ordered_files.append(files[i])
-                    if len(files)-1*i-1 != turn_index:
-                        #Rotate turned pages
-                        p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[-1*i-1],'90'])
-                        p.communicate()
-                        ordered_files.append(files[-1*i-1])
+            #If dealing with eBook scans
+            if files[0].find('.png') != -1:
+                ordered_files = files
+            #If dealing with physical scans
+            else:
+                turn_index = 0
+                helper = 0
+                #Find the 'TURN' picture in the folder
+                for pic in files:
+                    im = Image.open(INPUT_FOLDER+"/"+book+"/"+pic)
+                    #Check for the blue 'TURN' page and break when it's found
+                    if isPageColor(im, (60,80), (135,155), (135, 165)):
+                        turn_index = helper
+                        break
+                    helper += 1
+
+                #Starting odd or even?
+                im = Image.open(INPUT_FOLDER+"/"+book+"/"+files[-1])
+                #Is the last page of the folder the green 'ODD/EVEN' page?
+                right_start = isPageColor(im, (125,145), (155,175), (90,115))
+                #Special cases when I type in manually
+                #right_start = True
+
+                #Reorder the images and turn them appropriately
+                for i in range(0, turn_index):
+                    if right_start:
+                        if len(files)-1*i-2 != turn_index:
+                            #Rotate turned pages
+                            p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[-1*i-2],'90'])
+                            p.communicate()
+                            ordered_files.append(files[-1*i-2])
+                        p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[i],'270'])
+                        ordered_files.append(files[i])
+                    else:
+                        p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[i],'270'])
+                        ordered_files.append(files[i])
+                        if len(files)-1*i-1 != turn_index:
+                            #Rotate turned pages
+                            p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[-1*i-1],'90'])
+                            p.communicate()
+                            ordered_files.append(files[-1*i-1])
 
             #Show progress bar for books
             with tqdm(range(len(ordered_files)), desc="Pages...") as pbar2:

@@ -13,6 +13,8 @@ def main():
         os.mkdir("Parsed")
     if not os.path.exists("Texts"):
         os.mkdir("Texts")
+    if not os.path.exists("UncleanTexts"):
+        os.mkdir("UncleanTexts")
     if not os.path.exists("VRT"):
         os.mkdir("VRT")
     if not os.path.exists("PDFs"):

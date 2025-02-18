@@ -4,7 +4,7 @@ import os
 from natsort import natsorted
 
 INPUT_FOLDER = "Layouts"
-OUTPUT_FOLDER = "Texts"
+OUTPUT_FOLDER = "UncleanTexts"
 
 def includeIfWantedText(block_text: str) -> str:
     """
@@ -14,14 +14,15 @@ def includeIfWantedText(block_text: str) -> str:
     #Ignore purely numerical text blocks, as these are either page numbers or otherwise irrelevant
     if not str(block_text).isnumeric():
         #Ignore blocks which have under three words. These are usually titles or image-texts
-        if str(block_text).count(' ') > 2:
-            return block_text
+        #if str(block_text).count(' ') > 2:
+        return block_text
     return ""
 
 def main():
     for book in os.listdir(INPUT_FOLDER):
-        if os.path.exists(OUTPUT_FOLDER+"/"+book+".txt"):
+        if os.path.exists("Texts"+"/"+book+".txt"):
             continue
+        helper = 0
         text = ""
         for page in natsorted(os.listdir(INPUT_FOLDER+"/"+book)):
             page_path = INPUT_FOLDER+"/"+book+"/"+page
@@ -42,11 +43,13 @@ def main():
                                         for inner_inner_block in inner_block['textBlock']['blocks']:
                                             #Still still not interested in tables etc.
                                             if 'textBlock' in list(inner_inner_block.keys()):
-                                                text += includeIfWantedText(inner_inner_block['textBlock']['text'])
+                                                text += includeIfWantedText(inner_inner_block['textBlock']['text'])+'\n'
                                     else:
-                                        text += includeIfWantedText(inner_block['textBlock']['text'])
+                                        text += includeIfWantedText(inner_block['textBlock']['text'])+'\n'
                         else:
-                            text += includeIfWantedText(block['textBlock']['text'])
+                            text += includeIfWantedText(block['textBlock']['text'])+'\n'
+            text += '\n'+str(helper)+'\n\n'
+            helper += 1
                         
 
         #Write text to file

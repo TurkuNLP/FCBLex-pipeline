@@ -41,9 +41,9 @@ def main(
         project_id, location, processor_id, processor_version
     )
 
-    def processBooks(order: int) -> None:
+    def processBooks(order: int, pbar: tqdm) -> None:
         indices = list(range(order, len(os.listdir(doc_folder)), 3))
-        with tqdm(range(len(indices)), desc="OCRing books... "+str(order)) as pbar:
+        with pbar:
             #Fetch the images to be scanned
             for index in indices:
                 book = os.listdir(doc_folder)[index]
@@ -55,7 +55,6 @@ def main(
                 else:
                     os.mkdir(output_subdir)
                 
-                with tqdm(range(len(os.listdir(doc_folder+"/"+book))), desc="Processing pages... "+str(order)) as pbar2:
                     #Natsort the images so that we get the book in the correct order
                     for page in natsorted(os.listdir(doc_folder+"/"+book)):
                         page_path = doc_folder+"/"+book+"/"+page
@@ -94,16 +93,15 @@ def main(
                         with open(output_path, "w", encoding="utf-8") as fp:
                             #Parse text if text is not empty
                             json.dump(jsonObj, fp, ensure_ascii=False)
-
-                        pbar2.update(1)
                         #The count is maxxed out at 120 requests/min, so need to wait a bit in-between requests
                         #time.sleep(0.1)
-
-                    pbar.update(1)
-
-    p1 = Process(name='p1', target=processBooks, args=[0,])
-    p2 = Process(name='p2', target=processBooks, args=[1,])
-    p3 = Process(name='p3', target=processBooks, args=[2,])
+                pbar.update(1)
+    tqdms = []
+    for j in range(1,4):
+        tqdms.append(tqdm(list(range(j, len(os.listdir(doc_folder)), 3)), desc="Processing books in subprocess "+str(j)))
+    p1 = Process(name='p1', target=processBooks, args=[0, tqdms[0]])
+    p2 = Process(name='p2', target=processBooks, args=[1, tqdms[1]])
+    p3 = Process(name='p3', target=processBooks, args=[2, tqdms[2]])
     p1.start()
     p2.start()
     p3.start()
