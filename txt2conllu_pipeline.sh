@@ -1,4 +1,5 @@
 #!/bin/bash
 
-python scripts/parseBooksTrankit.py
-python scripts/trankitJson2Conllu.py
+sh scripts/postclean_process_texts.sh
+#python scripts/parseBooksTrankit.py
+#python scripts/trankitJson2Conllu.py

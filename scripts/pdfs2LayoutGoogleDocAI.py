@@ -40,71 +40,61 @@ def main(
     name = client.processor_version_path(
         project_id, location, processor_id, processor_version
     )
+    with tqdm(range(len(os.listdir(doc_folder))), desc="Processing books in subprocess...") as pbar:
+        indices = list(range(len(os.listdir(doc_folder))))
+        #Fetch the images to be scanned
+        for index in indices:
+            book = os.listdir(doc_folder)[index]
+            output_subdir = output_folder+"/"+book
+            #Don't do unnecessary work if book has already been processed
+            if os.path.exists(output_subdir):
+                continue
+            else:
+                os.mkdir(output_subdir)
+            with tqdm(range(len(os.listdir(doc_folder+"/"+book))), desc="Processing pages of book "+book) as pbar2:
+                #Natsort the images so that we get the book in the correct order
+                for page in natsorted(os.listdir(doc_folder+"/"+book)):
+                    page_path = doc_folder+"/"+book+"/"+page
+                    output_path = output_subdir+"/"+page.replace(".pdf", ".json")
+                    #Load doc to memory
+                    with open(page_path, "rb") as image:
+                        image_content = image.read()
 
-    def processBooks(order: int, pbar: tqdm) -> None:
-        indices = list(range(order, len(os.listdir(doc_folder)), 3))
-        with pbar:
-            #Fetch the images to be scanned
-            for index in indices:
-                book = os.listdir(doc_folder)[index]
-                output_subdir = output_folder+"/"+book
-                #Don't do unnecessary work if book has already been processed
-                if os.path.exists(output_subdir):
-                    pbar.update(1)
-                    continue
-                else:
-                    os.mkdir(output_subdir)
-                
-                    #Natsort the images so that we get the book in the correct order
-                    for page in natsorted(os.listdir(doc_folder+"/"+book)):
-                        page_path = doc_folder+"/"+book+"/"+page
-                        output_path = output_subdir+"/"+page.replace(".pdf", ".json")
-                        #Load doc to memory
-                        with open(page_path, "rb") as image:
-                            image_content = image.read()
+                    # Load binary data
+                    raw_document = documentai.RawDocument(content=image_content, mime_type=mime_type)
 
-                        # Load binary data
-                        raw_document = documentai.RawDocument(content=image_content, mime_type=mime_type)
-
-                        process_options = documentai.ProcessOptions(
-                            layout_config=documentai.ProcessOptions.LayoutConfig(
-                                chunking_config=documentai.ProcessOptions.LayoutConfig.ChunkingConfig(
-                                    chunk_size=1000,
-                                    include_ancestor_headings=True,
-                                )
+                    process_options = documentai.ProcessOptions(
+                        layout_config=documentai.ProcessOptions.LayoutConfig(
+                            chunking_config=documentai.ProcessOptions.LayoutConfig.ChunkingConfig(
+                                chunk_size=1000,
+                                include_ancestor_headings=True,
                             )
                         )
+                    )
 
 
-                        # Configure the process request
-                        request = documentai.ProcessRequest(
-                            name=name,
-                            raw_document=raw_document,
-                            field_mask=field_mask,
-                            process_options=process_options,
-                        )
+                    # Configure the process request
+                    request = documentai.ProcessRequest(
+                        name=name,
+                        raw_document=raw_document,
+                        field_mask=field_mask,
+                        process_options=process_options,
+                    )
 
-                        result = client.process_document(request=request)
+                    result = client.process_document(request=request)
 
-                        document = result.document
+                    document = result.document
 
-                        jsonObj = documentai.Document.to_json(document)
+                    jsonObj = documentai.Document.to_json(document)
 
-                        with open(output_path, "w", encoding="utf-8") as fp:
-                            #Parse text if text is not empty
-                            json.dump(jsonObj, fp, ensure_ascii=False)
-                        #The count is maxxed out at 120 requests/min, so need to wait a bit in-between requests
-                        #time.sleep(0.1)
-                pbar.update(1)
-    tqdms = []
-    for j in range(1,4):
-        tqdms.append(tqdm(list(range(j, len(os.listdir(doc_folder)), 3)), desc="Processing books in subprocess "+str(j)))
-    p1 = Process(name='p1', target=processBooks, args=[0, tqdms[0]])
-    p2 = Process(name='p2', target=processBooks, args=[1, tqdms[1]])
-    p3 = Process(name='p3', target=processBooks, args=[2, tqdms[2]])
-    p1.start()
-    p2.start()
-    p3.start()
+                    with open(output_path, "w", encoding="utf-8") as fp:
+                        #Parse text if text is not empty
+                        json.dump(jsonObj, fp, ensure_ascii=False)
+                    #The count is maxxed out at 120 requests/min, so need to wait a bit in-between requests
+                    #time.sleep(0.1)
+                    pbar2.update(1)
+            pbar.update(1)
+
 
 def getKeys(file_path: str = "docai") -> list:
     """

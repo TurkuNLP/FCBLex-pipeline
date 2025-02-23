@@ -22,8 +22,8 @@ def isPageColor(im, red_r: tuple, green_r: tuple, blue_r: tuple) -> bool:
         for x in range(1000, 2000):
             if pix[x,y][2]>blue_r[0] and pix[x,y][2]<blue_r[1] and pix[x,y][1]>green_r[0] and pix[x,y][1]<green_r[1] and pix[x,y][0]>red_r[0] and pix[x,y][0]<red_r[1]:
                 color_counter += 1
-    #If more than 85% of pixels match the specified color ranges, then it is deemed that color
-    return color_counter > 8500
+    #If more than 90% of pixels match the specified color ranges, then it is deemed that color
+    return color_counter > 9000
 
 def main():
 
@@ -38,6 +38,7 @@ def main():
                 os.mkdir(OUTPUT_FOLDER+"/"+book)
             #Natsorted files so that the images are correctly placed in the list
             files = natsorted(os.listdir(INPUT_FOLDER+"/"+book))
+            files = natsorted([x for x in files.copy() if str(x)[0] != '.'])
             ordered_files = []
             #If dealing with eBook scans
             if files[0].find('.png') != -1:
@@ -50,7 +51,7 @@ def main():
                 for pic in files:
                     im = Image.open(INPUT_FOLDER+"/"+book+"/"+pic)
                     #Check for the blue 'TURN' page and break when it's found
-                    if isPageColor(im, (60,80), (135,155), (135, 165)):
+                    if isPageColor(im, (60,95), (135,170), (135, 185)):
                         turn_index = helper
                         break
                     helper += 1
@@ -71,9 +72,11 @@ def main():
                             p.communicate()
                             ordered_files.append(files[-1*i-2])
                         p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[i],'270'])
+                        p.communicate()
                         ordered_files.append(files[i])
                     else:
                         p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[i],'270'])
+                        p.communicate()
                         ordered_files.append(files[i])
                         if len(files)-1*i-1 != turn_index:
                             #Rotate turned pages
