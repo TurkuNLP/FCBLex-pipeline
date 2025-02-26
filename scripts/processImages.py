@@ -2,9 +2,7 @@
 import os
 from natsort import natsorted
 from google.api_core.client_options import ClientOptions
-from google.cloud import documentai
 import pymupdf
-import fitz
 from PIL import Image
 from tqdm import tqdm
 import subprocess
@@ -22,8 +20,8 @@ def isPageColor(im, red_r: tuple, green_r: tuple, blue_r: tuple) -> bool:
         for x in range(1000, 2000):
             if pix[x,y][2]>blue_r[0] and pix[x,y][2]<blue_r[1] and pix[x,y][1]>green_r[0] and pix[x,y][1]<green_r[1] and pix[x,y][0]>red_r[0] and pix[x,y][0]<red_r[1]:
                 color_counter += 1
-    #If more than 90% of pixels match the specified color ranges, then it is deemed that color
-    return color_counter > 9000
+    #If more than 85% of pixels match the specified color ranges, then it is deemed that color
+    return color_counter > 8500
 
 def main():
 
@@ -55,14 +53,12 @@ def main():
                         turn_index = helper
                         break
                     helper += 1
-
                 #Starting odd or even?
                 im = Image.open(INPUT_FOLDER+"/"+book+"/"+files[-1])
                 #Is the last page of the folder the green 'ODD/EVEN' page?
-                right_start = isPageColor(im, (125,145), (155,175), (90,115))
+                right_start = isPageColor(im, (115,155), (145,185), (80,125))
                 #Special cases when I type in manually
                 #right_start = True
-
                 #Reorder the images and turn them appropriately
                 for i in range(0, turn_index):
                     if right_start:
@@ -88,10 +84,10 @@ def main():
             with tqdm(range(len(ordered_files)), desc="Pages...") as pbar2:
                 #For each book in PDFs
                 for i in range(len(ordered_files)):
-                    imgdoc = fitz.open(INPUT_FOLDER+"/"+book+"/"+ordered_files[i])
+                    imgdoc = pymupdf.open(INPUT_FOLDER+"/"+book+"/"+ordered_files[i])
                     #Open PDF as pymupdf doc
                     pdfbytes = imgdoc.convert_to_pdf()
-                    imgpdf = fitz.open("pdf", pdfbytes)
+                    imgpdf = pymupdf.open("pdf", pdfbytes)
                     imgpdf.save(OUTPUT_FOLDER+"/"+book+"/"+str(i)+".pdf")
                     pbar2.update(1)
 

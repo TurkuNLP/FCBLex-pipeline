@@ -23,6 +23,7 @@ def main():
 
             if os.path.exists("Parsed/"+file+"_parsed.json"):
                 print("Skipping...")
+                pbar.update(1)
                 continue
             text=""
             with open("Texts/"+file, "r") as reader:
