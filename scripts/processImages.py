@@ -64,19 +64,19 @@ def main():
                     if right_start:
                         if len(files)-1*i-2 != turn_index:
                             #Rotate turned pages
-                            p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[-1*i-2],'90'])
+                            p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[-1*i-2],'270'])
                             p.communicate()
                             ordered_files.append(files[-1*i-2])
-                        p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[i],'270'])
+                        p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[i],'90'])
                         p.communicate()
                         ordered_files.append(files[i])
                     else:
-                        p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[i],'270'])
+                        p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[i],'90'])
                         p.communicate()
                         ordered_files.append(files[i])
                         if len(files)-1*i-1 != turn_index:
                             #Rotate turned pages
-                            p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[-1*i-1],'90'])
+                            p = subprocess.Popen(['sh','scripts/rotateCameraImages.sh',files[-1*i-1],'270'])
                             p.communicate()
                             ordered_files.append(files[-1*i-1])
 
