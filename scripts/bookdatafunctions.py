@@ -98,16 +98,16 @@ def getSentenceData(books: dict) -> dict:
             pbar.update(1)
     return return_dict
 
-#Function which returns a dictionary [book_name, lemma_freq_pivot_table]
+#Function which returns a dictionary [book_name, lemma_freq_series]
 def getLemmaFrequencies(sentences: dict) -> dict:
     """
     Function which takes in sentence data and creates a dict with the lemma frequencies of each book
     :sentences: dict of form [book_name, pandas.DataFrame]
-    :return: dict of form [book_name, pandas.DataFrame] df contains lemmas and frequencies
+    :return: dict of form [book_name, pandas.Series] series contains lemmas and frequencies
     """
     lemma_freqs = {}
     for key in sentences:
-        lemma_freqs[key] = getLemmaFreq(sentences[key])
+        lemma_freqs[key] = sentences[key]['lemma'].value_counts()
     return lemma_freqs
 
 def getOnlyAlnums(sentences: dict, column: str) -> dict:
@@ -131,24 +131,16 @@ def getOnlyAlnums(sentences: dict, column: str) -> dict:
         clean[key] = no_punct
     return clean
 
-#Return dataframe with lemmas in descending order (ignoring PUNCT and non alnums)
-def getLemmaFreq(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Function which takes in a pd.DataFrame (sentence data) and spits out a df which has lemmas and their freqs
-    """
-    #Return a pivot_table turned DataFrame that counts the occurances of each lemma and sorts them in descending order
-    return pd.DataFrame.pivot_table(df, columns='lemma', aggfunc='size').sort_values(ascending=False).reset_index().rename(columns={0: "frequency"})
-
-#Get frequencies of words (not PUNCT, all to lowercase, and removed all non alnums)
+#Get frequencies of words)
 def getWordFrequencies(sentences: dict) -> dict:
     """
-    Function which takes in a dict of sentence data and spits out a dict with dfs containg word frequencies of the books
+    Function which takes in a dict of sentence data and spits out a dict with pd.Series containing word frequencies of the books
     """
     word_freqs = {}
     for key in sentences:
         df = sentences[key]
         #Map book_name to pivot table
-        word_freqs[key] = pd.DataFrame.pivot_table(df, columns='text', aggfunc='size').sort_values(ascending=False).reset_index().rename(columns={0: "frequency"})
+        word_freqs[key] = sentences[key]['text'].value_counts()
     return word_freqs
 
 
@@ -171,7 +163,8 @@ def getPOSFrequencies(sentences: dict) -> dict:
 
     for key in sentences:
         #Map book_name to pivot table
-        pos_freqs[key] = pd.DataFrame.pivot_table(sentences[key], columns='upos', aggfunc='size').sort_values(ascending=False).reset_index().rename(columns={0: "frequency"})
+        pos_freqs[key] = sentences[key]['upos'].value_counts()
+        #pd.DataFrame.pivot_table(sentences[key], columns='upos', aggfunc='size').sort_values(ascending=False).reset_index().rename(columns={0: "frequency"})
 
     return pos_freqs
 
@@ -179,9 +172,10 @@ def getPOSFrequencies(sentences: dict) -> dict:
 #Functions to get metrics from sentences
 
 #Function the get the average length of the unique lemmas in the sentenes
-def getAvgLen(data: dict, column: str) -> dict:
+def getAvgLen(data: dict, column: str=None) -> dict:
     """
-    Get the average length of either words or lemmas from sentence data
+    Get the average length of either words or lemmas from sentence data. Works for both original sentence data (pd.DataFrame) and processed ones,
+    such as frequency data (pd.Series)
     :data: dict of form [book_name, pd.DataFrame], df should contain sentence data
     :column: name of the CoNLLU column for which to calculate the average. Recommend either 'text' for words and 'lemma' for lemmas
     :return: dict of [book_name, avg_len], where avg_len is float
@@ -191,12 +185,20 @@ def getAvgLen(data: dict, column: str) -> dict:
         i = 1
         total_len = 0
         df = data[key]
-        #For each lemma count the length and add one to counter
-        for lemma in df[column]:
-            #Only care about strings
-            if type(lemma) is str:
-                total_len += len(lemma)
-                i += 1
+        if type(df) is pd.DataFrame:
+            #For each lemma count the length and add one to counter
+            for lemma in df[column]:
+                #Only care about strings
+                if type(lemma) is str:
+                    total_len += len(lemma)
+                    i += 1
+        elif type(df) is pd.Series:
+            #For each lemma count the length and add one to counter
+            for lemma in list(df.index):
+                #Only care about strings
+                if type(lemma) is str:
+                    total_len += len(lemma)
+                    i += 1
         #If no lemmas were found (should never happen but just in case), we make the avg_len be 0
         if i==1:
             avg_lens[key] = 0
@@ -207,7 +209,7 @@ def getAvgLen(data: dict, column: str) -> dict:
 
 def getAvgSentenceLens(books: dict) -> dict:
     """
-    Functon for gettign the average length of sentences in each book
+    Functon for getting the average length of sentences in each book
     :param books: dict of form [id, pd.DataFrame] like in the other methods
     :return: dict of form [id, double], where the double is the average sentence length of the corresponding book
     """
@@ -221,13 +223,13 @@ def getAvgSentenceLens(books: dict) -> dict:
     return lens
 
 #Function to calculate DP (deviation of proportions) of all the words in the corpus
-def getDP(v: dict, f_df: pd.DataFrame, s: dict) -> pd.DataFrame:
+def getDP(v: dict, f_series: pd.Series, s: dict) -> tuple:
     """
     Function which calculates the dispersion (DP) based on the formula by Greis
-    :v: dict of form [book_name, pd.DataFrame], df has frequencies per book
-    :f_df: pd.DataFrame that includes the total frequencies of words/lemmas in the whole corpus
+    :v: dict of form [book_name, pd.Series], series has frequencies per book
+    :f_df: pd.Series that includes the total frequencies of words/lemmas in the whole corpus
     :s: dict of form [book_name, ratio], where ratio is how much of the whole corpus a book takes
-    :return: pd.DataFrame that has the columns 'text', 'DP', 'DP_norm'
+    :return: tuple, where the first member is a pd.Series with DP, the second is a series with DP_norm
     """
     #First get the minimum s
     min_s = 1
@@ -237,32 +239,23 @@ def getDP(v: dict, f_df: pd.DataFrame, s: dict) -> pd.DataFrame:
     #For corpus parts that are length 1
     if min_s == 1:
         min_s = 0
-
-    v_series = {}
-    #Transform v into more usable form
-    for key in v:
-        v_df = v[key]
-        ser = v_df[v_df.columns[1]]
-        ser.index = v_df[v_df.columns[0]]
-        v_series[key] = ser
     
     texts = []
     DP = []
     DP_norm = []
-    with tqdm(range(len(f_df.index)), desc="DP calculations") as pbar:
+    with tqdm(range(len(f_series)), desc="DP calculations") as pbar:
 
         #Loop through every single word in the corpus
-        for k in range(len(f_df.index)):
+        for word in list(f_series.index):
             #Get the freq of the word in the whole corpus
-            word = f_df.iloc[k, 0]
-            f = f_df.iloc[k, 1]
+            f = f_series.loc[word]
             abs_sum = 0
             #For each document in the corpus
-            for key in v_series:
+            for key in v:
                 #Freq of word in document. Set to 0 if not found
                 v_i = 0
                 try:
-                    v_i = v_series[key].loc[word]*1.0
+                    v_i = v[key].loc[word]*1.0
                 except:
                     v_i = 0.0
                 #Comparative size of document to whole corpus
@@ -278,26 +271,26 @@ def getDP(v: dict, f_df: pd.DataFrame, s: dict) -> pd.DataFrame:
             DP_norm.append(dp/(1-min_s))
             #Update pbar
             pbar.update(1)
-    return pd.DataFrame({'text': texts, 'DP': DP, 'DP_norm': DP_norm})
+    return pd.Series(DP, texts), pd.Series(DP_norm, texts)
 
 #Function to get contextual diversity
-def getCD(v: dict):
+def getCD(v: dict) -> pd.Series:
     """
     Function which gets the contextual diversity of words/lemmas based on frequency data
     """
     #Get number of books
     books_num = len(v.keys())
     word_series = []
-    #For each dataframe attached to a book, look for a frequency list and gather all the words in a list
+    #For each series attached to a book, look for a frequency list and gather all the words in a list
     for key in v:
-        v_df = v[key]
-        word_series.append(v_df[v_df.columns[0]])
-    #Add all words to a new dataframe
-    series = pd.concat(word_series, ignore_index=True)
-    #Create pivot table to count in how many books does a word appear in
-    CD_raw = series.value_counts()
+        v_series = v[key]
+        word_series.append(list(v_series.index))
+    #Add all words to a new series
+    series = pd.Series(word_series)
+    #Create series to count in how many books does a word appear in (explode the series comprised of lists)
+    CD_raw = series.explode().value_counts()
     #Return Contextual Diversity by dividing the number of appearances by the total number of books
-    return CD_raw.apply(lambda x: x/books_num)
+    return CD_raw/books_num
 
 #Functions for getting values for different variables used in metrics
 
@@ -321,18 +314,18 @@ def getS(word_amounts: dict, l: int) -> dict:
     return s
 
 
-def combineFrequencies(freq_data: dict) -> pd.DataFrame:
+def combineFrequencies(freq_data: dict) -> pd.Series:
     """
     Get the total frequencies of passed freq_data in the corpus
     """
-    dfs = []
-    #Add all dataframes to list
+    series = []
+    #Add all series to list
     for key in freq_data:
-        dfs.append(freq_data[key])
-    #Concat all dataframes together
-    df = pd.concat(dfs, ignore_index=True)
-    #Return a dataframe containing text in one column and total freq in collection in the other
-    return df.groupby(df.columns[0])['frequency'].sum().reset_index()
+        series.append(freq_data[key])
+    #Concat all series together
+    ser = pd.concat(series)
+    #Return a series containing text as index and total freq in collection in the other
+    return ser.groupby(ser.index).sum()
 
 
 #Functions to do with sub-corpora
@@ -370,7 +363,7 @@ def combineSubCorpsData(corps: list):
     if type(combined) is pd.DataFrame:
         return combined.groupby(combined.columns[0])[combined.columns[1]].sum().reset_index()
     else:
-        return combined.groupby(level=0).sum().reset_index()
+        return combined.groupby(level=0).sum()
     
 
 def getTypeTokenRatios(v: dict, word_amounts: dict) -> pd.Series:
@@ -394,23 +387,23 @@ def getTypeTokenRatios(v: dict, word_amounts: dict) -> pd.Series:
         names.append(key)
     return pd.Series(ttrs, names)
 
-def getZipfValues(l: int, f: pd.DataFrame) -> pd.Series:
+def getZipfValues(l: int, f: pd.Series) -> pd.Series:
     """
     Function for calculating the Zipf values of words/lemmas in a corpus
     Zipf = ( (raw_freq + 1) / (Tokens per million + Types per million) )+3.0
     :param l: total length of corpus (token amount)
-    :param f: df containing frequency data of words/lemmas for the corpus
-    :return: pd.DataFrame, where indexes are words/lemmas and values the Zipf values
+    :param f: series containing frequency data of words/lemmas for the corpus
+    :return: pd.Series, where indexes are words/lemmas and values the Zipf values
     """
-    indexes = list(f[f.columns[0]])
+    indexes = list(f.index)
     types_per_mil = len(indexes)/1000000
     tokens_per_mil = l/1000000
-    zipfs = f[f.columns[1]]+1
+    zipfs = f.values+1
     zipfs = zipfs / (tokens_per_mil + types_per_mil)
     zipfs = np.log10(zipfs)
     zipfs = zipfs + 3.0
-    zipfs.index = indexes
-    return zipfs
+    #zipfs_ser = pd.Series(zipfs, indexes)
+    return pd.Series(zipfs, indexes)
 
 def cleanLemmas(sentences: dict) -> dict:
     """
@@ -505,30 +498,53 @@ def ignoreOtherAlphabets(sentences: dict) -> dict:
         clean[key] = filtered
     return clean
 
-def getSharedWords(wordFrequencies1: dict, wordFrequencies2: dict) -> pd.DataFrame:
+def getSharedWords(wordFrequencies1: dict, wordFrequencies2: dict) -> pd.Series:
     """
     Gives a pd.DataFrame object where there are two columns: first contains those words/lemmas which are shared and the second their combined frequencies
     """
     sub1 = combineFrequencies(wordFrequencies1)
     sub2 = combineFrequencies(wordFrequencies2)
 
-    shared = pd.concat([sub1, sub2], ignore_index=True)
-    mask = shared.duplicated(keep=False)
+    shared = pd.concat([sub1, sub2])
+    mask = shared.index.duplicated(keep=False)
     shared = shared[mask]
-    return shared.groupby(shared.columns[0])['frequency'].sum().reset_index()
+    return shared.groupby(shared.index).sum()
+
+def getTaivutusperheSize(corpus: dict) -> pd.Series:
+    """
+    Returns a series that contains the unique lemmas of the corpus and their 'inflection family size' (taivutusperheen koko)
+    """
+    #First, combine the data of separate books into one, massive df
+    dfs = []
+    for book in corpus:
+        dfs.append(corpus[book])
+    #Then limit to just words and lemmas
+    combined_df = pd.concat(dfs, ignore_index=True)[['text','lemma']]
+    #Drop duplicate words
+    mask = combined_df.drop_duplicates(subset=['text'])
+    #Get the counts of lemmas, aka the number of different inflections
+    tper = mask.value_counts('lemma')
+    return tper
+
+def dfToLowercase(df):
+    """
+    Simple function which maps all fields into lowercase letters
+    """
+    return df.copy().applymap(lambda x: str(x).lower())
 
 #Writing all data into one big xlsx-file
-def writeDataToXlsx(name, f_words, f_lemmas, pos_freqs, lemma_DP, word_DP, lemma_CD, word_CD, avg_uniq_lens_df, avg_lens_df):
+def writeDataToXlsx(
+        name, 
+        words, 
+        lemmas, 
+        pos_freqs,
+        avg_lens
+        ):
     """
     Write all wanted data to an xlsx file for testing purposes
     """
     with pd.ExcelWriter("Data/"+name+".xlsx") as writer:
-        f_words.to_excel(writer, sheet_name="Word frequencies")
-        f_lemmas.to_excel(writer, sheet_name="Lemma frequencies")
-        pos_freqs.to_excel(writer, sheet_name="POS frequencies")
-        lemma_DP.to_excel(writer, sheet_name="Lemma dispersion")
-        word_DP.to_excel(writer, sheet_name="Word dispersion")
-        lemma_CD.to_excel(writer, sheet_name="Lemma contextual diversity")
-        word_CD.to_excel(writer, sheet_name="Word contextual diversity")
-        avg_uniq_lens_df.to_excel(writer, sheet_name="Average unique lengths by book")
-        avg_lens_df.to_excel(writer, sheet_name="Average lengths by book")
+        words.to_excel(writer, sheet_name="Word data")
+        lemmas.to_excel(writer, sheet_name="Lemma data")
+        pos_freqs.to_excel(writer, sheet_name="POS data")
+        avg_lens.to_excel(writer, sheet_name="Average unique lengths data")

@@ -15,14 +15,14 @@ def main():
     sentences = bdf.initBooksFromConllus(CONLLU_PATH)
 
     #Subcorpora based on the target age groups
-    sentences_1 = bdf.cleanLemmas(bdf.getSubCorp(sentences, 1))
-    sentences_2 = bdf.cleanLemmas(bdf.getSubCorp(sentences, 2))
-    sentences_3 = bdf.cleanLemmas(bdf.getSubCorp(sentences, 3))
+    sentences_1 = bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.getSubCorp(sentences, 1)))
+    sentences_2 = bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.getSubCorp(sentences, 2)))
+    sentences_3 = bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.getSubCorp(sentences, 3)))
 
     #Versions of sentences for more meaningful data
-    sentences_no_punct_1 = bdf.cleanLemmas(sentences_1)
-    sentences_no_punct_2 = bdf.cleanLemmas(sentences_2)
-    sentences_no_punct_3 = bdf.cleanLemmas(sentences_3)
+    sentences_no_punct_1 = bdf.cleanWordBeginnings(bdf.cleanLemmas(sentences_1))
+    sentences_no_punct_2 = bdf.cleanWordBeginnings(bdf.cleanLemmas(sentences_2))
+    sentences_no_punct_3 = bdf.cleanWordBeginnings(bdf.cleanLemmas(sentences_3))
     sentences_no_punct = bdf.combineSubCorpDicts([sentences_no_punct_1, sentences_no_punct_2, sentences_no_punct_3])
 
     #Count lemma frequencies
