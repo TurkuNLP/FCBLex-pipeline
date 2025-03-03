@@ -5,7 +5,6 @@ from google.api_core.client_options import ClientOptions
 from google.cloud import documentai  # type: ignore
 import os
 from natsort import natsorted
-import time
 from tqdm import tqdm
 
 #Constants, switch up if need be

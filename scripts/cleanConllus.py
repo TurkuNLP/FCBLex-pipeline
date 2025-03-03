@@ -1,6 +1,4 @@
 #Imports
-import re
-import os
 import pandas as pd
 import bookdatafunctions as bdf
 

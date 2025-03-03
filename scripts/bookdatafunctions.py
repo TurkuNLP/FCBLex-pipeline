@@ -1,14 +1,9 @@
 #Imports
-import json
-import pyconll
 import pandas as pd
 import os
 import numpy as np
-import re
 from tqdm import trange, tqdm
-import matplotlib
 import matplotlib.pyplot as plt
-import openpyxl
 import seaborn as sns
 import math
 from scipy.stats import norm
@@ -532,6 +527,68 @@ def dfToLowercase(df):
     """
     return df.copy().applymap(lambda x: str(x).lower())
 
+def getNumOfTunits(corpus: dict) -> dict:
+    """
+    Function for returning the amount ot T-units for each book in the corpus
+    :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
+    :return:dict of form [id, int]
+    """
+
+    tunit_sizes = {}
+    for id in corpus:
+        book = corpus[id]
+        #id=='1' means the start of a new T-unit (lause)
+        tunit_sizes[id] = len(book[book['id'].astype(str)=='1'])
+    return tunit_sizes
+
+def getConjPerTunit(corpus: dict) -> dict:
+    """
+    Function for calculating the conjuction-to-T-unit ratio for each book in the corpus
+    :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
+    :return:dict of form [id, int]
+    """
+    conj_tunit_ratio = {}
+    tunit_sizes = getNumOfTunits(corpus)
+    for id in corpus:
+        book = corpus[id]
+        conj_num = len(book[book['upos'] == ('CCONJ' or 'SCONJ')])
+        conj_tunit_ratio[id] = conj_num/tunit_sizes[id]
+    return conj_tunit_ratio
+
+def getDeprelFeaturePerBook(corpus: dict, feature: str) -> dict:
+    """
+    Function for calculating the amount of wanted feature per 100 words for each book in the corpus
+    :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
+    :param feature: str that maps to some dependency relation in the CoNLLU format (https://universaldependencies.org/u/dep/index.html)
+    :return:dict of form [id, int]
+    """
+
+    returnable = {}
+    for key in corpus:
+        book = corpus[key]
+        num = len(book[book['deprel'] == feature])/100
+        returnable[key] = num
+    return returnable
+
+def getMultiVerbConstrNumPerTunit(corpus: dict) -> dict:
+    """
+    Function for calculating the conjuction-to-T-unit ratio for each book in the corpus
+    :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
+    :return:dict of form [id, int]
+    """
+    multiverb_tunit_ratio = {}
+    tunit_sizes = getNumOfTunits(corpus)
+    for id in corpus:
+        book = corpus[id]
+        modal_verb_num = len(book[((book['upos'] == 'AUX') & (book['xpos'] == 'V') & (book['deprel'] == 'aux')) | ((book['upos'] == 'VERB') & (book['deprel'] == 'xcomp'))])
+        multiverb_tunit_ratio[id] = modal_verb_num/tunit_sizes[id]
+    return multiverb_tunit_ratio
+
+def getDictAverage(corp_data: dict) -> float:
+    """
+    Simple function for calculating the average value of a dict containing book ids and some numerical values
+    """
+    return sum(list((corp_data.values())))/len(list(corp_data.keys()))
 #Writing all data into one big xlsx-file
 def writeDataToXlsx(
         name, 
