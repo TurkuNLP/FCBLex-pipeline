@@ -150,15 +150,22 @@ def getTokenAmounts(sentences: dict) -> dict:
     return word_amounts
 
 #Get PoS frequencies
-def getPOSFrequencies(sentences: dict) -> dict:
+def getPOSFrequencies(sentences: dict, scaler_tunit: bool=None) -> dict:
     """
     Function which gets the POS frequencies of sentences of books
     """
     pos_freqs = {}
 
+    if scaler_tunit:
+        tunit_sizes = getNumOfTunits(sentences)
+
     for key in sentences:
         #Map book_name to pivot table
-        pos_freqs[key] = sentences[key]['upos'].value_counts()
+        if scaler_tunit:
+            freqs = sentences[key]['upos'].value_counts()
+            pos_freqs[key]=freqs/tunit_sizes[key]
+        else:
+            pos_freqs[key] = sentences[key]['upos'].value_counts()
         #pd.DataFrame.pivot_table(sentences[key], columns='upos', aggfunc='size').sort_values(ascending=False).reset_index().rename(columns={0: "frequency"})
 
     return pos_freqs
@@ -555,20 +562,91 @@ def getConjPerTunit(corpus: dict) -> dict:
         conj_tunit_ratio[id] = conj_num/tunit_sizes[id]
     return conj_tunit_ratio
 
-def getDeprelFeaturePerBook(corpus: dict, feature: str) -> dict:
+def getPosFeaturePerBook(corpus: dict, feature: str, scaler_tunit: bool=None) -> dict:
     """
-    Function for calculating the amount of wanted feature per 100 words for each book in the corpus
+    Function for calculating the amount of wanted POS features for each book in the corpus
     :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
     :param feature: str that maps to some dependency relation in the CoNLLU format (https://universaldependencies.org/u/dep/index.html)
-    :return:dict of form [id, int]
+    :param scaler_tunit: optional bool that forces the use of T-unit amounts for scaling
+    :return:dict of form [id, float]
     """
 
     returnable = {}
+    if scaler_tunit:
+        tunit_sizes = getNumOfTunits(corpus)
     for key in corpus:
         book = corpus[key]
-        num = len(book[book['deprel'] == feature])/100
+        if scaler_tunit:
+            num = len(book[book['upos'] == feature])/tunit_sizes[key]
+        else:
+            num = len(book[book['upos'] == feature])
         returnable[key] = num
     return returnable
+
+def getDeprelFeaturePerBook(corpus: dict, feature: str, scaler_tunit: bool=None) -> dict:
+    """
+    Function for calculating the amount of wanted deprel features words for each book in the corpus
+    :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
+    :param feature: str that maps to some dependency relation in the CoNLLU format (https://universaldependencies.org/u/dep/index.html)
+    :param scaler_tunit: optional bool that forces the use of T-unit amounts for scaling
+    :return:dict of form [id, float]
+    """
+
+    returnable = {}
+    if scaler_tunit:
+        tunit_sizes = getNumOfTunits(corpus)
+    for key in corpus:
+        book = corpus[key]
+        if scaler_tunit:
+            num = len(book[book['deprel'] == feature])/tunit_sizes[key]
+        else:
+            num = len(book[book['deprel'] == feature])
+        returnable[key] = num
+    return returnable
+
+def getFeatsFeaturePerBook(corpus: dict, feature: str, scaler_tunit: bool=None) -> dict:
+    """
+    Function for calculating the amount of wanted feats feature for each book in the corpus
+    :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
+    :param feature: str that maps to some dependency relation in the CoNLLU format (https://universaldependencies.org/u/dep/index.html)
+    :param scaler_tunit: optional bool that forces the use of T-unit amounts for scaling
+    :return:dict of form [id, float]
+    """
+
+    returnable = {}
+    if scaler_tunit:
+        tunit_sizes = getNumOfTunits(corpus)
+    for key in corpus:
+        book = corpus[key]
+        #Mask those rows that don't have the wanted feature
+        m = book.copy().feats.apply(lambda x: (
+            x.find(feature) != -1
+                )
+            )
+        if scaler_tunit:
+            num = len(book[m])/tunit_sizes[key]
+        else:
+            num = len(book[m])
+        returnable[key] = num
+    return returnable
+
+def cohensdForSubcorps(subcorp1: dict, subcorp2: dict) -> float:
+    """
+    Function for calculating the effect size using Cohen's d for some feature values of two subcorpora
+    :param subcorp1: dictionary of form [id, float], calculated with e.g. getDeprelFeaturePerBook()
+    :param subcorp2: dict of the same form as above
+    :return: flaot measuring the effect size
+    """
+    data1 = list(subcorp1.values())
+    data2 = list(subcorp2.values())
+    #Sample size
+    n1, n2 = len(data1), len(data2)
+    #Variance
+    s1, s2 = np.var(data1, ddof=1), np.var(data2, ddof=1)
+    #Pooled standard deviation
+    s = math.sqrt( ((n1-1)*s1 + (n2-1)*s2)/(n1+n2-2) )
+    #Return Cohen's d
+    return ((np.mean(data1)-np.mean(data2)) / s)
 
 def getMultiVerbConstrNumPerTunit(corpus: dict) -> dict:
     """
@@ -589,13 +667,26 @@ def getDictAverage(corp_data: dict) -> float:
     Simple function for calculating the average value of a dict containing book ids and some numerical values
     """
     return sum(list((corp_data.values())))/len(list(corp_data.keys()))
+
+def combineSeriesForExcelWriter(f_lemmas, corpus, lemma_DP, lemma_CD, f_words, word_DP, word_CD):
+    """
+    Helper function for combining various Series containing lemma/word data into compact dataframes
+    """
+    lemma_data = pd.concat([f_lemmas, getTaivutusperheSize(corpus), lemma_DP, lemma_CD], axis=1)
+    lemma_data.columns = ['frequency','t_perh_size', 'DP', 'CD']
+
+    word_data = pd.concat([f_words, word_DP, word_CD], axis=1)
+    word_data.columns = ['frequency', 'DP', 'CD']
+
+
+    return lemma_data, word_data
+
 #Writing all data into one big xlsx-file
 def writeDataToXlsx(
         name, 
+        lemmas,
         words, 
-        lemmas, 
-        pos_freqs,
-        avg_lens
+        pos_freqs
         ):
     """
     Write all wanted data to an xlsx file for testing purposes
@@ -604,4 +695,4 @@ def writeDataToXlsx(
         words.to_excel(writer, sheet_name="Word data")
         lemmas.to_excel(writer, sheet_name="Lemma data")
         pos_freqs.to_excel(writer, sheet_name="POS data")
-        avg_lens.to_excel(writer, sheet_name="Average unique lengths data")
+        #avg_lens.to_excel(writer, sheet_name="Average unique lengths data")

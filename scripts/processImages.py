@@ -43,11 +43,11 @@ def main():
                 ordered_files = files
             #If dealing with physical scans
             else:
-                turn_index = 0
-                helper = 0
+                turn_index = int(len(files)/2)
+                helper = int(len(files)/2)-2
                 #Find the 'TURN' picture in the folder
-                for pic in files:
-                    im = Image.open(INPUT_FOLDER+"/"+book+"/"+pic)
+                for pic in list(range(helper, helper+4)):
+                    im = Image.open(INPUT_FOLDER+"/"+book+"/"+files[pic])
                     #Check for the blue 'TURN' page and break when it's found
                     if isPageColor(im, (60,95), (135,170), (135, 185)):
                         turn_index = helper

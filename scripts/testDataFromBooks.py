@@ -1,5 +1,7 @@
 import bookdatafunctions as bdf
 import pandas as pd
+import warnings
+warnings.filterwarnings('ignore')
 
 #Constants
 JSON_PATH = "Parsed"
@@ -12,7 +14,7 @@ def main():
 
     #Move to working with just sentence data
     #Whole corpus
-    sentences = bdf.initBooksFromConllus(CONLLU_PATH)
+    sentences = bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.initBooksFromConllus(CONLLU_PATH)))
 
     #Subcorpora based on the target age groups
     sentences_1 = bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.getSubCorp(sentences, 1)))
@@ -121,17 +123,17 @@ def main():
     v_lemmas = lemma_freqs
 
     #Whole corpus
-    lemma_DP = bdf.getDP(v_lemmas, f_lemmas, s)
+    lemma_DP, lemma_DP_norm = bdf.getDP(v_lemmas, f_lemmas, s)
     #Sub-corpora
-    lemma_DP_1 = bdf.getDP(lemma_freqs_1, f_lemmas_1, s_1)
-    lemma_DP_2 = bdf.getDP(lemma_freqs_2, f_lemmas_2, s_2)
-    lemma_DP_3 = bdf.getDP(lemma_freqs_3, f_lemmas_3, s_3)
+    lemma_DP_1, lemma_DP_norm_1 = bdf.getDP(lemma_freqs_1, f_lemmas_1, s_1)
+    lemma_DP_2, lemma_DP_norm_2 = bdf.getDP(lemma_freqs_2, f_lemmas_2, s_2)
+    lemma_DP_3, lemma_DP_norm_3 = bdf.getDP(lemma_freqs_3, f_lemmas_3, s_3)
     #Whole corpus
-    word_DP = bdf.getDP(v_words, f_words, s)
+    word_DP, word_DP_norm = bdf.getDP(v_words, f_words, s)
     #Sub-corpora
-    word_DP_1 = bdf.getDP(word_freqs_1, f_words_1, s_1)
-    word_DP_2 = bdf.getDP(word_freqs_2, f_words_2, s_2)
-    word_DP_3 = bdf.getDP(word_freqs_3, f_words_3, s_3)
+    word_DP_1, word_DP_norm_1 = bdf.getDP(word_freqs_1, f_words_1, s_1)
+    word_DP_2, word_DP_norm_2 = bdf.getDP(word_freqs_2, f_words_2, s_2)
+    word_DP_3, word_DP_norm_3 = bdf.getDP(word_freqs_3, f_words_3, s_3)
 
     #Getting CD
 
@@ -161,11 +163,18 @@ def main():
 
     pos_freqs_corpus = bdf.combineFrequencies(pos_freqs_per_book)
 
-    #Commencing the writing part
-    bdf.writeDataToXlsx("Whole_corpus", f_words, f_lemmas, pos_freqs_corpus, lemma_DP, word_DP, lemma_CD, word_CD, avg_uniq_lens_df, avg_lens_df)
-    bdf.writeDataToXlsx("Sub_corp_1", f_words_1, f_lemmas_1, pos_freqs_1, lemma_DP_1, word_DP_1, lemma_CD_1, word_CD_1, avg_uniq_lens_df_1, avg_lens_df_1)
-    bdf.writeDataToXlsx("Sub_corp_2", f_words_2, f_lemmas_2, pos_freqs_2, lemma_DP_2, word_DP_2, lemma_CD_2, word_CD_2, avg_uniq_lens_df_2, avg_lens_df_2)
-    bdf.writeDataToXlsx("Sub_corp_3", f_words_3, f_lemmas_3, pos_freqs_3, lemma_DP_3, word_DP_3, lemma_CD_3, word_CD_3, avg_uniq_lens_df_3, avg_lens_df_3)
+    #Combine previously gathered data into neat dataframes
+
+    lemma_data, word_data = bdf.combineSeriesForExcelWriter(f_lemmas, sentences, lemma_DP, lemma_CD, f_words, word_DP, word_CD)
+    lemma_data_1, word_data_1 = bdf.combineSeriesForExcelWriter(f_lemmas_1, sentences_1, lemma_DP_1, lemma_CD_1, f_words_1, word_DP_1, word_CD_1)
+    lemma_data_2, word_data_2 = bdf.combineSeriesForExcelWriter(f_lemmas_2, sentences_2, lemma_DP_2, lemma_CD_2, f_words_2, word_DP_2, word_CD_2)
+    lemma_data_3, word_data_3 = bdf.combineSeriesForExcelWriter(f_lemmas_3, sentences_3, lemma_DP_3, lemma_CD_3, f_words_3, word_DP_3, word_CD_3)
+
+    #Write to excel-files
+    bdf.writeDataToXlsx("Whole_corpus", lemmas=lemma_data, words=word_data, pos_freqs=pos_freqs_corpus)
+    bdf.writeDataToXlsx("Sub_corpus_1", lemmas=lemma_data_1, words=word_data_1, pos_freqs=pos_freqs_1)
+    bdf.writeDataToXlsx("Sub_corpus_2", lemmas=lemma_data_2, words=word_data_2, pos_freqs=pos_freqs_2)
+    bdf.writeDataToXlsx("Sub_corpus_3", lemmas=lemma_data_3, words=word_data_3, pos_freqs=pos_freqs_3)
 
 
 if __name__ == "__main__":
