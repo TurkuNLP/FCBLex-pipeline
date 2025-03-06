@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import math
 from scipy.stats import norm
-
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import logging
 
 def initBooksFromJsons(json_path: str) -> dict:
     """
@@ -667,6 +669,68 @@ def getDictAverage(corp_data: dict) -> float:
     Simple function for calculating the average value of a dict containing book ids and some numerical values
     """
     return sum(list((corp_data.values())))/len(list(corp_data.keys()))
+
+def getBookLemmaCosineSimilarities(corpus: dict, f_lemma: pd.Series) -> pd.DataFrame:
+    """
+    Calculating cosine similarities of all lemmas between the books in the corpus. Inspired by Korochkina et el. 2024
+    """
+    tf_idf_scores = {}
+
+    #Sort the books so that we get groupings by age group
+    key1 = []
+    key2 = []
+    key3 = []
+    for key in corpus.keys():
+        if key[14]=='1':
+            key1.append(key)
+        elif key[14]=='2':
+            key2.append(key)
+        else:
+            key3.append(key)
+    sorted_keys = key1+key2+key3
+
+    #Get all corpus' lemmas from lemma frequency data
+    all_lemmas = list(f_lemma.index)
+    book_vectorizer = TfidfVectorizer(vocabulary=all_lemmas)
+    for book in sorted_keys:
+        #Tf-idf scores from lemma data of a book
+        book_lemmas = " ".join(corpus[book]['lemma'].values)
+        #print(book_lemmas.values)
+        tf_idf_scores[book] = book_vectorizer.fit_transform([book_lemmas])
+    similarity_scores = {}
+    for book in sorted_keys:
+        #Compare current book to every other book
+        scores = []
+        for comp in sorted_keys:
+            scores.append(cosine_similarity(tf_idf_scores[book], tf_idf_scores[comp]))
+        similarity_scores[book] = scores
+    #Create df
+    matrix_df = pd.DataFrame.from_dict(similarity_scores, orient='index').transpose()
+    #Set indexes correctly
+    matrix_df.index = tf_idf_scores.keys()
+    #Dig out the values from nd.array
+    matrix_df_2 = matrix_df.copy().applymap(lambda x: x[0][0])
+    return addAgeGroupSeparatorsToDF(matrix_df_2)
+
+def addAgeGroupSeparatorsToDF(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Function for adding separator lines to a df that's menat to be shown as a heatmap!
+    """
+    indices = list(df.index)
+    one2two = 0
+    while indices[one2two][14]=='1':
+        one2two += 1
+    two2three = one2two
+    while indices[two2three][14]=='2':
+        two2three += 1
+    df.insert(one2two, 'one2two', pd.Series([1]*len(indices)))
+    df.insert(two2three+1, 'two2three', pd.Series([1]*len(indices)))
+    temp_dict = dict(zip(df.columns, ([1]*(len(indices)+2))))
+    row1 = pd.DataFrame(temp_dict, index=['one2two'])
+    row2 = pd.DataFrame(temp_dict, index=['two2three'])
+    df_2 = pd.concat([df.iloc[:one2two], row1, df.iloc[one2two:]])
+    df_2 = pd.concat([df_2.iloc[:two2three+1], row2, df_2.iloc[two2three+1:]])
+    return df_2
 
 def combineSeriesForExcelWriter(f_lemmas, corpus, lemma_DP, lemma_CD, f_words, word_DP, word_CD):
     """
