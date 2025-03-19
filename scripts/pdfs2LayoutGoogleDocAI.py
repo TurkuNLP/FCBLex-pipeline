@@ -47,6 +47,7 @@ def main(
             output_subdir = output_folder+"/"+book
             #Don't do unnecessary work if book has already been processed
             if os.path.exists(output_subdir):
+                pbar.update(1)
                 continue
             else:
                 os.mkdir(output_subdir)
