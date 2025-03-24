@@ -134,7 +134,7 @@ def main():
     #Sub-corpora
     sub_word_dp = []
     for i in range(len(ages)):
-        sub_lemma_dp.append(bdf.getDP(sub_word_freqs[i], sub_f_words[i], sub_s[i])[0])
+        sub_word_dp.append(bdf.getDP(sub_word_freqs[i], sub_f_words[i], sub_s[i])[0])
 
     #Getting CD
 
@@ -151,7 +151,7 @@ def main():
     sub_lemma_cd = []
     for i in range(len(ages)):
         sub_lemma_cd.append(bdf.getCD(sub_lemma_freqs[i]))
-
+        
     #Get POS frequencies
 
     #Count POS frequencies

@@ -361,8 +361,10 @@ def getRangeSubCorp(corp: dict, num: int) -> dict:
     """
     sub_corp = {}
     for key in corp:
-        if (key.find('_'+str(num-1)+'_') != -1 or key.find('_'+str(num)+'_') != -1 or key.find('_'+str(num+1)+'_') != -1 ):
-            sub_corp[key] = corp[key]
+        age = int(findAgeFromID(key))
+        if (num - age < 2 and num - age > -2):
+            df = corp[key]
+            sub_corp[key] = df
     return sub_corp
 
 def getDistinctSubCorp(corp: dict, num: int) -> dict:
@@ -707,18 +709,8 @@ def getBookLemmaCosineSimilarities(corpus: dict, f_lemma: pd.Series) -> pd.DataF
     tf_idf_scores = {}
 
     #Sort the books so that we get groupings by age group
-    key1 = []
-    key2 = []
-    key3 = []
-    for key in corpus.keys():
-        age = int(findAgeFromID(key))
-        if age<=8:
-            key1.append(key)
-        elif 9<age<13:
-            key2.append(key)
-        else:
-            key3.append(key)
-    sorted_keys = key1+key2+key3
+    sorted_keys = list(corpus.keys())
+    sorted_keys.sort(key=lambda x:int(findAgeFromID(x)))
 
     #Get all corpus' lemmas from lemma frequency data
     all_lemmas = list(f_lemma.index)
