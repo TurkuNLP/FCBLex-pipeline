@@ -6,116 +6,117 @@ warnings.filterwarnings('ignore')
 #Constants
 JSON_PATH = "Parsed"
 CONLLU_PATH = "Conllus"
+ISBN2AGE_PATH = "ISBN2AGE/ISBN2AGE.xlsx"
 
 def main():
     
 
-    books = bdf.initBooksFromJsons(JSON_PATH)
+    #books = bdf.initBooksFromJsons(JSON_PATH)
 
     #Move to working with just sentence data
     #Whole corpus
-    sentences = bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.initBooksFromConllus(CONLLU_PATH)))
+    sentences = bdf.mapGroup2Age(bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.initBooksFromConllus(CONLLU_PATH))), ISBN2AGE_PATH)
+
+    ages = bdf.getAvailableAges(sentences)
 
     #Subcorpora based on the target age groups
-    sentences_1 = bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.getSubCorp(sentences, 1)))
-    sentences_2 = bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.getSubCorp(sentences, 2)))
-    sentences_3 = bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.getSubCorp(sentences, 3)))
+    sub_sentences = []
+    for i in ages:
+        sub_sentences.append(bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.getDistinctSubCorp(sentences, i))))
 
     #Versions of sentences for more meaningful data
-    sentences_no_punct_1 = bdf.cleanWordBeginnings(bdf.cleanLemmas(sentences_1))
-    sentences_no_punct_2 = bdf.cleanWordBeginnings(bdf.cleanLemmas(sentences_2))
-    sentences_no_punct_3 = bdf.cleanWordBeginnings(bdf.cleanLemmas(sentences_3))
-    sentences_no_punct = bdf.combineSubCorpDicts([sentences_no_punct_1, sentences_no_punct_2, sentences_no_punct_3])
+    sub_sentences_no_punct = []
+    for i in range(len(ages)):
+        sub_sentences_no_punct.append(bdf.cleanWordBeginnings(bdf.cleanLemmas(sub_sentences[i])))
+    sentences_no_punct = bdf.cleanWordBeginnings(sentences)
 
     #Count lemma frequencies
+    sub_lemma_freqs = []
+    for i in range(len(ages)):
+        sub_lemma_freqs.append(bdf.getLemmaFrequencies(sub_sentences[i]))
 
-    lemma_freqs_1 = bdf.getLemmaFrequencies(sentences_1)
-    lemma_freqs_2 = bdf.getLemmaFrequencies(sentences_2)
-    lemma_freqs_3 = bdf.getLemmaFrequencies(sentences_3)
-
-    lemma_freqs = bdf.combineSubCorpDicts([lemma_freqs_1, lemma_freqs_2, lemma_freqs_3])
+    lemma_freqs = bdf.getLemmaFrequencies(sentences)
 
     #Count word frequencies
+    sub_word_freqs = []
+    for i in range(len(ages)):
+        sub_word_freqs.append(bdf.getWordFrequencies(sub_sentences[i]))
 
-    word_freqs_1 = bdf.getWordFrequencies(sentences_1)
-    word_freqs_2 = bdf.getWordFrequencies(sentences_2)
-    word_freqs_3 = bdf.getWordFrequencies(sentences_3)
-
-    word_freqs = bdf.combineSubCorpDicts([word_freqs_1, word_freqs_2, word_freqs_3])
+    word_freqs = bdf.getWordFrequencies(sentences)
 
     #Just for interest's sake, info on how many tokens (non-punct) are in each book
 
-    word_amounts_1 = bdf.getTokenAmounts(sentences_1)
-    word_amounts_2 = bdf.getTokenAmounts(sentences_2)
-    word_amounts_3 = bdf.getTokenAmounts(sentences_3)
+    sub_word_amounts = []
+    for i in range(len(ages)):
+        sub_word_amounts.append(bdf.getTokenAmounts(sub_sentences[i]))
 
-    word_amounts = bdf.combineSubCorpDicts([word_amounts_1, word_amounts_2, word_amounts_3])
+    word_amounts = bdf.getTokenAmounts(sentences)
 
     #Count the average uniq lemma lengths
-    avg_uniq_lemma_lens_1 = bdf.getAvgLen(lemma_freqs_1, 'lemma')
-    avg_uniq_lemma_lens_2 = bdf.getAvgLen(lemma_freqs_2, 'lemma')
-    avg_uniq_lemma_lens_3 = bdf.getAvgLen(lemma_freqs_3, 'lemma')
+    sub_avg_uniq_lemma_lens = []
+    for i in range(len(ages)):
+        sub_avg_uniq_lemma_lens.append(bdf.getAvgLen(sub_lemma_freqs[i], 'lemma'))
     avg_uniq_lemma_lens = bdf.getAvgLen(lemma_freqs, 'lemma')
     #print(avg_uniq_lemma_lens)
 
     #Count the average uniq word lengths
-    avg_uniq_word_lens_1 = bdf.getAvgLen(word_freqs_1, 'text')
-    avg_uniq_word_lens_2 = bdf.getAvgLen(word_freqs_2, 'text')
-    avg_uniq_word_lens_3 = bdf.getAvgLen(word_freqs_3, 'text')
+    sub_avg_uniq_word_lens = []
+    for i in range(len(ages)):
+        sub_avg_uniq_word_lens.append(bdf.getAvgLen(sub_word_freqs[i], 'text'))
     avg_uniq_word_lens = bdf.getAvgLen(word_freqs, 'text')
     #print(avg_uniq_word_lens)
 
     #Count the average lemma lengths
-    avg_lemma_lens_1 = bdf.getAvgLen(sentences_no_punct_1, 'lemma')
-    avg_lemma_lens_2 = bdf.getAvgLen(sentences_no_punct_2, 'lemma')
-    avg_lemma_lens_3 = bdf.getAvgLen(sentences_no_punct_3, 'lemma')
+    sub_avg_lemma_lens = []
+    for i in range(len(ages)):
+        sub_avg_lemma_lens.append(bdf.getAvgLen(sub_sentences_no_punct[i], 'lemma'))
     avg_lemma_lens = bdf.getAvgLen(sentences_no_punct, 'lemma')
     #print(avg_lemma_lens)
 
     #Count the average word lengths
-    avg_word_lens_1 = bdf.getAvgLen(sentences_no_punct_1, 'text')
-    avg_word_lens_2 = bdf.getAvgLen(sentences_no_punct_2, 'text')
-    avg_word_lens_3 = bdf.getAvgLen(sentences_no_punct_3, 'text')
+    sub_avg_word_lens = []
+    for i in range(len(ages)):
+        sub_avg_word_lens.append(bdf.getAvgLen(sub_sentences_no_punct[i], 'text'))
     avg_word_lens = bdf.getAvgLen(sentences_no_punct, 'text')
     #print(avg_word_lens)
 
 
     #Combining results into dfs
-
-    avg_uniq_lens_df_1 = pd.DataFrame.from_dict([avg_uniq_lemma_lens_1, avg_uniq_word_lens_1]).transpose().rename(columns={0: 'Unique lemmas avg length', 1: 'Unique words avg length'})
-    avg_uniq_lens_df_2 = pd.DataFrame.from_dict([avg_uniq_lemma_lens_2, avg_uniq_word_lens_2]).transpose().rename(columns={0: 'Unique lemmas avg length', 1: 'Unique words avg length'})
-    avg_uniq_lens_df_3 = pd.DataFrame.from_dict([avg_uniq_lemma_lens_3, avg_uniq_word_lens_3]).transpose().rename(columns={0: 'Unique lemmas avg length', 1: 'Unique words avg length'})
+    avg_uniq_lens_dfs = []
+    for i in range(len(ages)):
+        avg_uniq_lens_dfs.append(pd.DataFrame.from_dict([sub_avg_uniq_lemma_lens[i], sub_avg_uniq_word_lens[i]]).transpose().rename(columns={0: 'Unique lemmas avg length', 1: 'Unique words avg length'}))
     avg_uniq_lens_df = pd.DataFrame.from_dict([avg_uniq_lemma_lens, avg_uniq_word_lens]).transpose().rename(columns={0: 'Unique lemmas avg length', 1: 'Unique words avg length'})
 
 
-    avg_lens_df_1 = pd.DataFrame.from_dict([avg_lemma_lens_1, avg_word_lens_1]).transpose().rename(columns={0: 'All lemmas avg length', 1: 'All words avg length'})
-    avg_lens_df_2 = pd.DataFrame.from_dict([avg_lemma_lens_2, avg_word_lens_2]).transpose().rename(columns={0: 'All lemmas avg length', 1: 'All words avg length'})
-    avg_lens_df_3 = pd.DataFrame.from_dict([avg_lemma_lens_3, avg_word_lens_3]).transpose().rename(columns={0: 'All lemmas avg length', 1: 'All words avg length'})
+
+    avg_lens_dfs = []
+    for i in range(len(ages)):
+        avg_lens_dfs.append(pd.DataFrame.from_dict([sub_avg_lemma_lens[i], sub_avg_word_lens[i]]).transpose().rename(columns={0: 'Unique lemmas avg length', 1: 'Unique words avg length'}))
     avg_lens_df = pd.DataFrame.from_dict([avg_lemma_lens, avg_word_lens]).transpose().rename(columns={0: 'Unique lemmas avg length', 1: 'Unique words avg length'})
 
     #Constants to be used in different measures
 
     #The length of the corpus in words (no PUNCT)
-    l_1 = bdf.getL(word_amounts_1)
-    l_2 = bdf.getL(word_amounts_2)
-    l_3 = bdf.getL(word_amounts_3)
-    l = l_1+l_2+l_3
+    sub_l = []
+    for i in range(len(ages)):
+        sub_l.append(bdf.getL(sub_word_amounts[i]))
+    l = sum(sub_l)
     #The length of the corpus in parts
     n = len(sentences.keys())
     #The percentages of the n corpus part sizes
-    s_1 = bdf.getS(word_amounts_1, l_1)
-    s_2 = bdf.getS(word_amounts_2, l_2)
-    s_3 = bdf.getS(word_amounts_3, l_3)
+    sub_s = []
+    for i in range(len(ages)):
+        sub_s.append(bdf.getS(sub_word_amounts[i], sub_l[i]))
     s = bdf.getS(word_amounts, l)
     #The overall frequencies of words in corpus
-    f_words_1 = bdf.combineFrequencies(word_freqs_1)
-    f_words_2 = bdf.combineFrequencies(word_freqs_2)
-    f_words_3 = bdf.combineFrequencies(word_freqs_3)
+    sub_f_words = []
+    for i in range(len(ages)):
+        sub_f_words.append(bdf.combineFrequencies(sub_word_freqs[i]))
     f_words = bdf.combineFrequencies(word_freqs)
     #The overall frequencies of lemmas in corpus
-    f_lemmas_1 = bdf.combineFrequencies(lemma_freqs_1)
-    f_lemmas_2 = bdf.combineFrequencies(lemma_freqs_2)
-    f_lemmas_3 = bdf.combineFrequencies(lemma_freqs_3)
+    sub_f_lemmas = []
+    for i in range(len(ages)):
+        sub_f_lemmas.append(bdf.combineFrequencies(sub_lemma_freqs[i]))
     f_lemmas = bdf.combineFrequencies(lemma_freqs)
     #The frequencies of words in each corpus part
     v_words = word_freqs
@@ -125,31 +126,31 @@ def main():
     #Whole corpus
     lemma_DP, lemma_DP_norm = bdf.getDP(v_lemmas, f_lemmas, s)
     #Sub-corpora
-    lemma_DP_1, lemma_DP_norm_1 = bdf.getDP(lemma_freqs_1, f_lemmas_1, s_1)
-    lemma_DP_2, lemma_DP_norm_2 = bdf.getDP(lemma_freqs_2, f_lemmas_2, s_2)
-    lemma_DP_3, lemma_DP_norm_3 = bdf.getDP(lemma_freqs_3, f_lemmas_3, s_3)
+    sub_lemma_dp = []
+    for i in range(len(ages)):
+        sub_lemma_dp.append(bdf.getDP(sub_lemma_freqs[i], sub_f_lemmas[i], sub_s[i])[0])
     #Whole corpus
     word_DP, word_DP_norm = bdf.getDP(v_words, f_words, s)
     #Sub-corpora
-    word_DP_1, word_DP_norm_1 = bdf.getDP(word_freqs_1, f_words_1, s_1)
-    word_DP_2, word_DP_norm_2 = bdf.getDP(word_freqs_2, f_words_2, s_2)
-    word_DP_3, word_DP_norm_3 = bdf.getDP(word_freqs_3, f_words_3, s_3)
+    sub_word_dp = []
+    for i in range(len(ages)):
+        sub_lemma_dp.append(bdf.getDP(sub_word_freqs[i], sub_f_words[i], sub_s[i])[0])
 
     #Getting CD
 
     #Whole corpus
     word_CD = bdf.getCD(v_words)
     #Sub-corpora
-    word_CD_1 = bdf.getCD(word_freqs_1)
-    word_CD_2 = bdf.getCD(word_freqs_2)
-    word_CD_3 = bdf.getCD(word_freqs_3)
+    sub_word_cd = []
+    for i in range(len(ages)):
+        sub_word_cd.append(bdf.getCD(sub_word_freqs[i]))
 
     #Whole corpus
     lemma_CD = bdf.getCD(v_lemmas)
     #Sub-corpora
-    lemma_CD_1 = bdf.getCD(lemma_freqs_1)
-    lemma_CD_2 = bdf.getCD(lemma_freqs_2)
-    lemma_CD_3 = bdf.getCD(lemma_freqs_3)
+    sub_lemma_cd = []
+    for i in range(len(ages)):
+        sub_lemma_cd.append(bdf.getCD(sub_lemma_freqs[i]))
 
     #Get POS frequencies
 
@@ -157,24 +158,24 @@ def main():
 
     pos_freqs_per_book = bdf.getPOSFrequencies(sentences)
 
-    pos_freqs_1 = bdf.combineFrequencies(bdf.getSubCorp(pos_freqs_per_book, 1))
-    pos_freqs_2 = bdf.combineFrequencies(bdf.getSubCorp(pos_freqs_per_book, 2))
-    pos_freqs_3 = bdf.combineFrequencies(bdf.getSubCorp(pos_freqs_per_book, 3))
+    sub_pos_freqs = []
+    for i in ages:
+        sub_pos_freqs.append(bdf.combineFrequencies(bdf.getDistinctSubCorp(pos_freqs_per_book, i)))
 
     pos_freqs_corpus = bdf.combineFrequencies(pos_freqs_per_book)
 
     #Combine previously gathered data into neat dataframes
 
     lemma_data, word_data = bdf.combineSeriesForExcelWriter(f_lemmas, sentences, lemma_DP, lemma_CD, f_words, word_DP, word_CD)
-    lemma_data_1, word_data_1 = bdf.combineSeriesForExcelWriter(f_lemmas_1, sentences_1, lemma_DP_1, lemma_CD_1, f_words_1, word_DP_1, word_CD_1)
-    lemma_data_2, word_data_2 = bdf.combineSeriesForExcelWriter(f_lemmas_2, sentences_2, lemma_DP_2, lemma_CD_2, f_words_2, word_DP_2, word_CD_2)
-    lemma_data_3, word_data_3 = bdf.combineSeriesForExcelWriter(f_lemmas_3, sentences_3, lemma_DP_3, lemma_CD_3, f_words_3, word_DP_3, word_CD_3)
+    sub_data = []
+    for i in range(len(ages)):
+        sub_data.append(bdf.combineSeriesForExcelWriter(sub_f_lemmas[i], sub_sentences[i], sub_lemma_dp[i], sub_lemma_cd[i], sub_f_words[i], sub_word_dp[i], sub_word_cd[i]))
+
 
     #Write to excel-files
     bdf.writeDataToXlsx("Whole_corpus", lemmas=lemma_data, words=word_data, pos_freqs=pos_freqs_corpus)
-    bdf.writeDataToXlsx("Sub_corpus_1", lemmas=lemma_data_1, words=word_data_1, pos_freqs=pos_freqs_1)
-    bdf.writeDataToXlsx("Sub_corpus_2", lemmas=lemma_data_2, words=word_data_2, pos_freqs=pos_freqs_2)
-    bdf.writeDataToXlsx("Sub_corpus_3", lemmas=lemma_data_3, words=word_data_3, pos_freqs=pos_freqs_3)
+    for i in range(len(ages)):
+        bdf.writeDataToXlsx("Sub_corpus_"+str(ages[i]), lemmas=sub_data[i][0], words=sub_data[i][1], pos_freqs=sub_pos_freqs[i])
 
 
 if __name__ == "__main__":

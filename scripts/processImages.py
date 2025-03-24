@@ -6,6 +6,7 @@ import pymupdf
 from PIL import Image
 from tqdm import tqdm
 import subprocess
+import cv2
 
 #Constants
 OUTPUT_FOLDER = "PDFs"
@@ -13,19 +14,9 @@ INPUT_FOLDER = "IMGs"
 IMG_FORMAT = ".JPG" #switch to png if needed
 
 def isPageColor(im, red_r: tuple, green_r: tuple, blue_r: tuple, test=None) -> bool:
-    pix = im.load()
-
-    color_counter = 0
-    for y in range(1000, 2000):
-        for x in range(1000, 2000):
-            if pix[x,y][2]>blue_r[0] and pix[x,y][2]<blue_r[1] and pix[x,y][1]>green_r[0] and pix[x,y][1]<green_r[1] and pix[x,y][0]>red_r[0] and pix[x,y][0]<red_r[1]:
-                color_counter += 1
-            #else:
-            #    print(test," R: ",pix[x,y][0]," G: ",pix[x,y][1]," B: ",pix[x,y][2])
-            #    print(color_counter)
-    #If more than 17% of pixels match the specified color ranges, then it is deemed that color
-    #print(color_counter)
-    return color_counter > 170000
+    #Use cv2 to chekc the average pixel color of image and return true if it fits in the specified RGB ranges
+    avg_color = cv2.mean(im[0:im.shape[0], 0:im.shape[1]])
+    return ((red_r[0] < avg_color[0] < red_r[1]) and (green_r[0] < avg_color[1] < green_r[1]) and (blue_r[0] < avg_color[2] < blue_r[1]))
 
 def main():
 
@@ -51,16 +42,16 @@ def main():
                 helper = int(len(files)/2)-2
                 #Find the 'TURN' picture in the folder
                 for pic in list(range(helper, helper+4)):
-                    im = Image.open(INPUT_FOLDER+"/"+book+"/"+files[pic])
+                    im = cv2.imread(INPUT_FOLDER+"/"+book+"/"+files[pic])
                     #Check for the blue 'TURN' page and break when it's found
-                    if isPageColor(im, (60,105), (135,180), (135, 185), files[pic]):
+                    if isPageColor(im, (100,165), (140,170), (70, 95), files[pic]):
                         turn_index = helper
                         break
                     helper += 1
                 #Starting odd or even?
-                im = Image.open(INPUT_FOLDER+"/"+book+"/"+files[-1])
+                im = cv2.imread(INPUT_FOLDER+"/"+book+"/"+files[-1])
                 #Is the last page of the folder the green 'ODD/EVEN' page?
-                right_start = isPageColor(im, (115,155), (145,185), (80,150))
+                right_start = isPageColor(im, (100,140), (135,165), (100,130))
                 left_pages = list(range(0, turn_index))
                 right_pages = list(range(turn_index+1, len(files)))
                 #If the book starts on a right page then don't include the green 'ODD/EVEN' image

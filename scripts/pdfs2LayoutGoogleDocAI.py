@@ -45,15 +45,26 @@ def main(
         for index in indices:
             book = os.listdir(doc_folder)[index]
             output_subdir = output_folder+"/"+book
+            #Set a flag for continuing process if it stopped previously from an error - no need to do unnecessary work!
+            continue_on = False
             #Don't do unnecessary work if book has already been processed
             if os.path.exists(output_subdir):
-                pbar.update(1)
-                continue
+                if len(os.listdir(output_subdir)) == len(os.listdir(doc_folder+"/"+book)):
+                    pbar.update(1)
+                    continue
+                else:
+                    continue_on = True
             else:
                 os.mkdir(output_subdir)
             with tqdm(range(len(os.listdir(doc_folder+"/"+book))), desc="Processing pages of book "+book) as pbar2:
+                pages = natsorted(os.listdir(doc_folder+"/"+book))
+                start_index = 0
+                if continue_on:
+                    start_index=len(os.listdir(output_subdir))-1
+                    pbar2.update(start_index)
                 #Natsort the images so that we get the book in the correct order
-                for page in natsorted(os.listdir(doc_folder+"/"+book)):
+                for i in range(start_index, len(pages)):
+                    page = pages[i]
                     page_path = doc_folder+"/"+book+"/"+page
                     output_path = output_subdir+"/"+page.replace(".pdf", ".json")
                     #Load doc to memory

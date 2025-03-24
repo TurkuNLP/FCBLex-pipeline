@@ -95,6 +95,19 @@ def getSentenceData(books: dict) -> dict:
             pbar.update(1)
     return return_dict
 
+def maskPropn(corpus: dict[str,pd.DataFrame]) -> dict:
+    """
+    Function which masks all the proper nouns from the dict for classifier training purposes
+    """
+    returnable = {}
+    for key in corpus:
+        df = corpus[key]
+        df.loc[df['upos'] == 'PROPN', 'lemma'] = ""
+        df.loc[df['upos'] == 'PROPN', 'text'] = ""
+        returnable[key] = df
+    return returnable
+
+
 #Function which returns a dictionary [book_name, lemma_freq_series]
 def getLemmaFrequencies(sentences: dict) -> dict:
     """
@@ -334,11 +347,28 @@ def combineFrequencies(freq_data: dict) -> pd.Series:
 
 #Functions to do with sub-corpora
 
-
-def getSubCorp(corp: dict, num: int) -> dict:
+def getAvailableAges(corpus: dict) -> list[int]:
     """
-    Simple function to get sub_corpora from the whole package based on the target age group
-    Naming conventions are ISBN_age-group_register, where age-group is an int [1,3]
+    Function which returns the ages that are currently available as sub corpora
+    """
+    return list(map(int,list(set([findAgeFromID(x) for x in list(corpus.keys())]))))
+
+
+def getRangeSubCorp(corp: dict, num: int) -> dict:
+    """
+    Simple function to get sub_corpora from the whole package based on the target age, such that a book will go to +-1 range of its target age
+    Naming conventions are ISBN_age-group_register, where age is an int [5,16]
+    """
+    sub_corp = {}
+    for key in corp:
+        if (key.find('_'+str(num-1)+'_') != -1 or key.find('_'+str(num)+'_') != -1 or key.find('_'+str(num+1)+'_') != -1 ):
+            sub_corp[key] = corp[key]
+    return sub_corp
+
+def getDistinctSubCorp(corp: dict, num: int) -> dict:
+    """
+    Simple function to get sub_corpora from the whole package based on the target age exactly, so eahc book will only be included once
+    Naming conventions are ISBN_age-group_register, where age is an int [5,16]
     """
     sub_corp = {}
     for key in corp:
@@ -681,9 +711,10 @@ def getBookLemmaCosineSimilarities(corpus: dict, f_lemma: pd.Series) -> pd.DataF
     key2 = []
     key3 = []
     for key in corpus.keys():
-        if key[14]=='1':
+        age = int(findAgeFromID(key))
+        if age<=8:
             key1.append(key)
-        elif key[14]=='2':
+        elif 9<age<13:
             key2.append(key)
         else:
             key3.append(key)
@@ -714,14 +745,14 @@ def getBookLemmaCosineSimilarities(corpus: dict, f_lemma: pd.Series) -> pd.DataF
 
 def addAgeGroupSeparatorsToDF(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Function for adding separator lines to a df that's menat to be shown as a heatmap!
+    Function for adding separator lines to a df that's meant to be shown as a heatmap!
     """
     indices = list(df.index)
     one2two = 0
-    while indices[one2two][14]=='1':
+    while int(findAgeFromID(indices[one2two]))<9:
         one2two += 1
     two2three = one2two
-    while indices[two2three][14]=='2':
+    while int(findAgeFromID(indices[two2three]))<13:
         two2three += 1
     df.insert(one2two, 'one2two', pd.Series([1]*len(indices)))
     df.insert(two2three+1, 'two2three', pd.Series([1]*len(indices)))
@@ -744,6 +775,26 @@ def combineSeriesForExcelWriter(f_lemmas, corpus, lemma_DP, lemma_CD, f_words, w
 
 
     return lemma_data, word_data
+
+#Moving to a regression task instead of hard age groups
+
+def findAgeFromID(key: str) -> str:
+    "Function that returns the age information embedded in a book id"
+    return key[key.find('_')+1:key.find('_')+1+key[key.find('_')+1:].find('_')]
+
+def mapGroup2Age(corpus: dict[str,pd.DataFrame], sheet_path: str) -> dict[str,pd.DataFrame]:
+    """
+    Function for changing the file keys to use exact ages instead of age groups [1,3]
+    """
+
+    returnable = {}
+    isbn2age_series = pd.DataFrame(pd.read_excel(sheet_path, index_col=0))
+    for key in corpus:
+        df = corpus[key]
+        new_key = key
+        new_key = key[:14] +  str(isbn2age_series.at[int(key[:13]),isbn2age_series.columns[0]]) + key[15:]
+        returnable[new_key] = df
+    return returnable
 
 #Writing all data into one big xlsx-file
 def writeDataToXlsx(

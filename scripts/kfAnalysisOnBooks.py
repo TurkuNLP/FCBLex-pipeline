@@ -21,9 +21,9 @@ print("Start...")
 
 books = bdf.cleanWordBeginnings(bdf.cleanLemmas(bdf.initBooksFromConllus("Conllus")))
 
-sub_1 = bdf.getSubCorp(books, 1)
-sub_2 = bdf.getSubCorp(books, 2)
-sub_3 = bdf.getSubCorp(books, 3)
+sub_1 = bdf.getDistinctSubCorp(books, 1)
+sub_2 = bdf.getDistinctSubCorp(books, 2)
+sub_3 = bdf.getDistinctSubCorp(books, 3)
 
 print("Processing dependency relations...")
 

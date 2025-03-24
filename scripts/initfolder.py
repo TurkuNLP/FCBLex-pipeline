@@ -23,6 +23,8 @@ def main():
         os.mkdir("IMGs")
     if not os.path.exists("Layouts"):
         os.mkdir("Layouts")
+    if not os.path.exists("ISBN2AGE"):
+        os.mkdir("ISBN2AGE")
     if not os.path.exists("docai"):
         with open("docai", "w", encoding="utf-8") as writer:
             writer.write("project_id;region;processor_id")
