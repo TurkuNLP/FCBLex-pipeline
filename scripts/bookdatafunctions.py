@@ -165,20 +165,20 @@ def getTokenAmounts(sentences: dict) -> dict:
     return word_amounts
 
 #Get PoS frequencies
-def getPOSFrequencies(sentences: dict, scaler_tunit: bool=None) -> dict:
+def getPOSFrequencies(sentences: dict, scaler_sentences: bool=None) -> dict:
     """
     Function which gets the POS frequencies of sentences of books
     """
     pos_freqs = {}
 
-    if scaler_tunit:
-        tunit_sizes = getNumOfTunits(sentences)
+    if scaler_sentences:
+        sentences_sizes = getNumOfSentences(sentences)
 
     for key in sentences:
         #Map book_name to pivot table
-        if scaler_tunit:
+        if scaler_sentences:
             freqs = sentences[key]['upos'].value_counts()
-            pos_freqs[key]=freqs/tunit_sizes[key]
+            pos_freqs[key]=freqs/sentences_sizes[key]
         else:
             pos_freqs[key] = sentences[key]['upos'].value_counts()
         #pd.DataFrame.pivot_table(sentences[key], columns='upos', aggfunc='size').sort_values(ascending=False).reset_index().rename(columns={0: "frequency"})
@@ -568,88 +568,88 @@ def dfToLowercase(df):
     """
     return df.copy().applymap(lambda x: str(x).lower())
 
-def getNumOfTunits(corpus: dict) -> dict:
+def getNumOfSentences(corpus: dict) -> dict:
     """
-    Function for returning the amount ot T-units for each book in the corpus
+    Function for returning the amount ot sentences for each book in the corpus
     :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
     :return:dict of form [id, int]
     """
 
-    tunit_sizes = {}
+    sentences_sizes = {}
     for id in corpus:
         book = corpus[id]
-        #id=='1' means the start of a new T-unit (lause)
-        tunit_sizes[id] = len(book[book['id'].astype(str)=='1'])
-    return tunit_sizes
+        #id=='1' means the start of a new sentence (lause)
+        sentences_sizes[id] = len(book[book['id'].astype(str)=='1'])
+    return sentences_sizes
 
-def getConjPerTunit(corpus: dict) -> dict:
+def getConjPerSentence(corpus: dict) -> dict:
     """
-    Function for calculating the conjuction-to-T-unit ratio for each book in the corpus
+    Function for calculating the conjuction-to-sentence ratio for each book in the corpus
     :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
     :return:dict of form [id, int]
     """
-    conj_tunit_ratio = {}
-    tunit_sizes = getNumOfTunits(corpus)
+    conj_sentences_ratio = {}
+    sentences_sizes = getNumOfSentences(corpus)
     for id in corpus:
         book = corpus[id]
         conj_num = len(book[book['upos'] == ('CCONJ' or 'SCONJ')])
-        conj_tunit_ratio[id] = conj_num/tunit_sizes[id]
-    return conj_tunit_ratio
+        conj_sentences_ratio[id] = conj_num/sentences_sizes[id]
+    return conj_sentences_ratio
 
-def getPosFeaturePerBook(corpus: dict, feature: str, scaler_tunit: bool=None) -> dict:
+def getPosFeaturePerBook(corpus: dict, feature: str, scaler_sentences: bool=None) -> dict:
     """
     Function for calculating the amount of wanted POS features for each book in the corpus
     :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
     :param feature: str that maps to some dependency relation in the CoNLLU format (https://universaldependencies.org/u/dep/index.html)
-    :param scaler_tunit: optional bool that forces the use of T-unit amounts for scaling
+    :param scaler_sentences: optional bool that forces the use of sentence amounts for scaling
     :return:dict of form [id, float]
     """
 
     returnable = {}
-    if scaler_tunit:
-        tunit_sizes = getNumOfTunits(corpus)
+    if scaler_sentences:
+        sentences_sizes = getNumOfSentences(corpus)
     for key in corpus:
         book = corpus[key]
-        if scaler_tunit:
-            num = len(book[book['upos'] == feature])/tunit_sizes[key]
+        if scaler_sentences:
+            num = len(book[book['upos'] == feature])/sentences_sizes[key]
         else:
             num = len(book[book['upos'] == feature])
         returnable[key] = num
     return returnable
 
-def getDeprelFeaturePerBook(corpus: dict, feature: str, scaler_tunit: bool=None) -> dict:
+def getDeprelFeaturePerBook(corpus: dict, feature: str, scaler_sentences: bool=None) -> dict:
     """
     Function for calculating the amount of wanted deprel features words for each book in the corpus
     :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
     :param feature: str that maps to some dependency relation in the CoNLLU format (https://universaldependencies.org/u/dep/index.html)
-    :param scaler_tunit: optional bool that forces the use of T-unit amounts for scaling
+    :param scaler_sentences: optional bool that forces the use of sentence amounts for scaling
     :return:dict of form [id, float]
     """
 
     returnable = {}
-    if scaler_tunit:
-        tunit_sizes = getNumOfTunits(corpus)
+    if scaler_sentences:
+        sentences_sizes = getNumOfSentences(corpus)
     for key in corpus:
         book = corpus[key]
-        if scaler_tunit:
-            num = len(book[book['deprel'] == feature])/tunit_sizes[key]
+        if scaler_sentences:
+            num = len(book[book['deprel'] == feature])/sentences_sizes[key]
         else:
             num = len(book[book['deprel'] == feature])
         returnable[key] = num
     return returnable
 
-def getFeatsFeaturePerBook(corpus: dict, feature: str, scaler_tunit: bool=None) -> dict:
+def getFeatsFeaturePerBook(corpus: dict, feature: str, scaler_sentences: bool=None) -> dict:
     """
     Function for calculating the amount of wanted feats feature for each book in the corpus
     :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
     :param feature: str that maps to some dependency relation in the CoNLLU format (https://universaldependencies.org/u/dep/index.html)
-    :param scaler_tunit: optional bool that forces the use of T-unit amounts for scaling
+    :param scaler_sentences: optional bool that forces the use of sentence amounts for scaling
     :return:dict of form [id, float]
     """
 
     returnable = {}
-    if scaler_tunit:
-        tunit_sizes = getNumOfTunits(corpus)
+    if scaler_sentences:
+        sentences_sizes = getNumOfSentences(corpus)
     for key in corpus:
         book = corpus[key]
         #Mask those rows that don't have the wanted feature
@@ -657,8 +657,8 @@ def getFeatsFeaturePerBook(corpus: dict, feature: str, scaler_tunit: bool=None) 
             x.find(feature) != -1
                 )
             )
-        if scaler_tunit:
-            num = len(book[m])/tunit_sizes[key]
+        if scaler_sentences:
+            num = len(book[m])/sentences_sizes[key]
         else:
             num = len(book[m])
         returnable[key] = num
@@ -682,19 +682,19 @@ def cohensdForSubcorps(subcorp1: dict, subcorp2: dict) -> float:
     #Return Cohen's d
     return ((np.mean(data1)-np.mean(data2)) / s)
 
-def getMultiVerbConstrNumPerTunit(corpus: dict) -> dict:
+def getMultiVerbConstrNumPerSentence(corpus: dict) -> dict:
     """
-    Function for calculating the conjuction-to-T-unit ratio for each book in the corpus
+    Function for calculating the conjuction-to-sentence ratio for each book in the corpus
     :param corpus: Dict with form [id, pd.DataFrame]. where df has sentence data
     :return:dict of form [id, int]
     """
-    multiverb_tunit_ratio = {}
-    tunit_sizes = getNumOfTunits(corpus)
+    multiverb_sentences_ratio = {}
+    sentences_sizes = getNumOfSentences(corpus)
     for id in corpus:
         book = corpus[id]
         modal_verb_num = len(book[((book['upos'] == 'AUX') & (book['xpos'] == 'V') & (book['deprel'] == 'aux')) | ((book['upos'] == 'VERB') & (book['deprel'] == 'xcomp'))])
-        multiverb_tunit_ratio[id] = modal_verb_num/tunit_sizes[id]
-    return multiverb_tunit_ratio
+        multiverb_sentences_ratio[id] = modal_verb_num/sentences_sizes[id]
+    return multiverb_sentences_ratio
 
 def getDictAverage(corp_data: dict) -> float:
     """
