@@ -733,6 +733,7 @@ def getBookLemmaCosineSimilarities(corpus: dict, f_lemma: pd.Series) -> pd.DataF
     matrix_df.index = tf_idf_scores.keys()
     #Dig out the values from nd.array
     matrix_df_2 = matrix_df.copy().applymap(lambda x: x[0][0])
+    return matrix_df_2
     return addAgeGroupSeparatorsToDF(matrix_df_2)
 
 def addAgeGroupSeparatorsToDF(df: pd.DataFrame) -> pd.DataFrame:
@@ -767,6 +768,23 @@ def combineSeriesForExcelWriter(f_lemmas, corpus, lemma_DP, lemma_CD, f_words, w
 
 
     return lemma_data, word_data
+
+
+def filterRegisters(corpus: dict[str,pd.DataFrame], registers: list[int]) -> dict[str,pd.DataFrame]:
+    """
+    Function for creating a register sepcific subcorpus. Valid registers are:
+    1 = Fiction
+    2 = Non-fiction, non-textbook
+    3 = Textbook
+    You can pass as many registers as you want (any valid subset of [1,2,3])
+    """
+
+    returnable = {}
+    for key in corpus:
+        if int(key[-1]) in registers:
+            df = corpus[key]
+            returnable[key] = df
+    return returnable
 
 #Moving to a regression task instead of hard age groups
 

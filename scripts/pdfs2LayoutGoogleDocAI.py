@@ -8,6 +8,9 @@ from natsort import natsorted
 from tqdm import tqdm
 import json
 from multiprocessing import Process
+from google.api_core import exceptions
+from google.api_core.retry import Retry
+
 
 #Constants, switch up if need be
 MANUAL_SCAN = True
@@ -39,6 +42,20 @@ def main(
     name = client.processor_version_path(
         project_id, location, processor_id, processor_version
     )
+
+    _MY_RETRIABLE_TYPES = (
+        exceptions.TooManyRequests,  # 429
+        exceptions.InternalServerError,  # 500
+        exceptions.BadGateway,  # 502
+        exceptions.ServiceUnavailable,  # 503
+    )
+
+    def is_retryable(exc):
+        return isinstance(exc, _MY_RETRIABLE_TYPES)
+
+    my_retry_policy = Retry(predicate=is_retryable)
+
+
     with tqdm(range(len(os.listdir(doc_folder))), desc="Processing books in subprocess...") as pbar:
         indices = list(range(len(os.listdir(doc_folder))))
         #Fetch the images to be scanned
@@ -92,7 +109,7 @@ def main(
                         process_options=process_options,
                     )
 
-                    result = client.process_document(request=request)
+                    result = client.process_document(request=request, retry=my_retry_policy)
 
                     document = result.document
 

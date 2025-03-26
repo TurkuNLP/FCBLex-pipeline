@@ -1,7 +1,6 @@
 *.txt
 *.gz
 .ipynb_checkpoints/*
-*.ipynb
 cache/*
 trankit/*
 __pycache__
@@ -21,3 +20,4 @@ UncleanTexts
 temp
 *.log
 ProbPDFs
+Deprecated
