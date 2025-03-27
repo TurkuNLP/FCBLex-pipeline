@@ -555,9 +555,9 @@ def getTaivutusperheSize(corpus: dict) -> pd.Series:
     for book in corpus:
         dfs.append(corpus[book])
     #Then limit to just words and lemmas
-    combined_df = pd.concat(dfs, ignore_index=True)[['text','lemma']]
+    combined_df = pd.concat(dfs, ignore_index=True)[['lemma','feats']]
     #Drop duplicate words
-    mask = combined_df.drop_duplicates(subset=['text'])
+    mask = combined_df.drop_duplicates()
     #Get the counts of lemmas, aka the number of different inflections
     tper = mask.value_counts('lemma')
     return tper
