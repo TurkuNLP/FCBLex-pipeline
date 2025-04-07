@@ -578,8 +578,8 @@ def getNumOfSentences(corpus: dict) -> dict:
     sentences_sizes = {}
     for id in corpus:
         book = corpus[id]
-        #id=='1' means the start of a new sentence (lause)
-        sentences_sizes[id] = len(book[book['id'].astype(str)=='1'])
+        #Each sentences should have one word with deprel=='root' means the start of a new sentence (lause)
+        sentences_sizes[id] = len(book[book['deprel'].astype(str)=='root'])
     return sentences_sizes
 
 def getConjPerSentence(corpus: dict) -> dict:
@@ -804,6 +804,21 @@ def mapGroup2Age(corpus: dict[str,pd.DataFrame], sheet_path: str) -> dict[str,pd
         new_key = key
         new_key = key[:14] +  str(isbn2age_series.at[int(key[:13]),isbn2age_series.columns[0]]) + key[15:]
         returnable[new_key] = df
+    return returnable
+
+def mapExactAgeToMean(corpus: dict[str,pd.DataFrame]) -> dict[str,pd.DataFrame]:
+    """
+    Function for taking exact ages in ids and mapping them to age groups/means of age intervals
+    """
+    returnable = {}
+    for key in corpus:
+        if int(findAgeFromID(key))<9:
+            new_key = key[:key.find('_')]+'_7_'+key[-1]
+        elif 8<int(findAgeFromID(key))<13:
+            new_key = key[:key.find('_')]+'_11_'+key[-1]
+        else:
+            new_key = key[:key.find('_')]+'_14_'+key[-1]
+        returnable[new_key] = corpus[key]
     return returnable
 
 #Writing all data into one big xlsx-file
