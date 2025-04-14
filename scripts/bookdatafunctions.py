@@ -702,7 +702,7 @@ def getDictAverage(corp_data: dict) -> float:
     """
     return sum(list((corp_data.values())))/len(list(corp_data.keys()))
 
-def getBookLemmaCosineSimilarities(corpus: dict, f_lemma: pd.Series) -> pd.DataFrame:
+def getBookLemmaCosineSimilarities(corpus: dict[str,pd.DataFrame], f_lemma: pd.Series) -> pd.DataFrame:
     """
     Calculating cosine similarities of all lemmas between the books in the corpus. Inspired by Korochkina et el. 2024
     """
@@ -717,7 +717,7 @@ def getBookLemmaCosineSimilarities(corpus: dict, f_lemma: pd.Series) -> pd.DataF
     book_vectorizer = TfidfVectorizer(vocabulary=all_lemmas)
     for book in sorted_keys:
         #Tf-idf scores from lemma data of a book
-        book_lemmas = " ".join(corpus[book]['lemma'].values)
+        book_lemmas = " ".join(corpus[book]['lemma'].to_numpy(dtype=str))
         #print(book_lemmas.values)
         tf_idf_scores[book] = book_vectorizer.fit_transform([book_lemmas])
     similarity_scores = {}

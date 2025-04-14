@@ -52,7 +52,7 @@ def main():
                 #Starting odd or even?
                 im = cv2.imread(INPUT_FOLDER+"/"+book+"/"+files[-1])
                 #Is the last page of the folder the green 'ODD/EVEN' page?
-                right_start = isPageColor(im, (100,140), (135,165), (100,125))
+                right_start = isPageColor(im, (100,140), (140,165), (100,125))
                 left_pages = list(range(0, turn_index))
                 right_pages = list(range(turn_index+1, len(files)))
                 #If the book starts on a right page then don't include the green 'ODD/EVEN' image
