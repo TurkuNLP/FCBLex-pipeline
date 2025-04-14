@@ -815,10 +815,11 @@ def mapExactAgeToMean(corpus: dict[str,pd.DataFrame]) -> dict[str,pd.DataFrame]:
         if int(findAgeFromID(key))<9:
             new_key = key[:key.find('_')]+'_7_'+key[-1]
         elif 8<int(findAgeFromID(key))<13:
-            new_key = key[:key.find('_')]+'_11_'+key[-1]
+            new_key = key[:key.find('_')]+'_10_'+key[-1]
         else:
             new_key = key[:key.find('_')]+'_14_'+key[-1]
-        returnable[new_key] = corpus[key]
+        df = corpus[key]
+        returnable[new_key] = df
     return returnable
 
 #Writing all data into one big xlsx-file

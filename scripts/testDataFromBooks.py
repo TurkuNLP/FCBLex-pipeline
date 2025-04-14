@@ -6,7 +6,7 @@ warnings.filterwarnings('ignore')
 #Constants
 JSON_PATH = "Parsed"
 CONLLU_PATH = "Conllus"
-ISBN2AGE_PATH = "ISBN2AGE/ISBN2AGE.xlsx"
+ISBN2AGE_PATH = "ISBN_MAPS/ISBN2AGE.xlsx"
 
 def main():
     
