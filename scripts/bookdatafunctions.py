@@ -44,7 +44,7 @@ def initBooksFromConllus(conllu_path: str) -> dict:
         #Opening conllus contents
         with open(conllu_path+"/"+file) as conllu_file:
             #Transform into dataframe
-            df = pd.read_csv(conllu_file, sep="[\t]", header=None, on_bad_lines='skip', engine='python')
+            df = pd.read_csv(conllu_file, sep="[\t]",skip_blank_lines=True,  header=None, on_bad_lines='error', engine='python')
             #Set names for columns
             df.columns = ['id', 'text', 'lemma', 'upos', 'xpos', 'feats', 'head', 'deprel', 'deps', 'misc']
             #Append as dict juuuuust in case we need the metadata
@@ -153,6 +153,16 @@ def getWordFrequencies(sentences: dict) -> dict:
         word_freqs[key] = sentences[key]['text'].value_counts()
     return word_freqs
 
+def getColumnFrequencies(corpus: dict[str,pd.DataFrame], columns=list[str]) -> dict[str,pd.DataFrame]:
+    """
+    A more general function for calculating frequencies of rows in our corpus format
+    """
+    freqs = {}
+    for key in corpus:
+        book = corpus[key]
+        freqs[key] = book[columns].value_counts()
+    return freqs
+
 
 def getTokenAmounts(sentences: dict) -> dict:
     """
@@ -256,39 +266,25 @@ def getDP(v: dict, f_series: pd.Series, s: dict) -> tuple:
     #For corpus parts that are length 1
     if min_s == 1:
         min_s = 0
-    
-    texts = []
+
+    words = [x[0] for x in f_series.index]
     DP = []
     DP_norm = []
     with tqdm(range(len(f_series)), desc="DP calculations") as pbar:
-
         #Loop through every single word in the corpus
-        for word in list(f_series.index):
+        for word in words:
             #Get the freq of the word in the whole corpus
-            f = f_series.loc[word]
-            abs_sum = 0
-            #For each document in the corpus
-            for key in v:
-                #Freq of word in document. Set to 0 if not found
-                v_i = 0
-                try:
-                    v_i = v[key].loc[word]*1.0
-                except:
-                    v_i = 0.0
-                #Comparative size of document to whole corpus
-                s_i = s[key]
-                #Calculate the abs_sum used in calculating DP as written by Gries [2020]
-                abs_sum += abs(((v_i)/f)-s_i)
-            #Append word to list
-            texts.append(word)
+            f = f_series[word]
+            #Calculations according to the dispersion measure by Gries 2020
+            abs_sum_i = [((v[key].get(word, 0.0))/f)-s[key] for key in v]
             #Calculate and append DP
-            dp = 0.5*abs_sum
+            dp = np.sum(np.absolute(abs_sum_i))*0.5
             DP.append(dp)
             #Append DP_norm to list (alltho with how many documents we have, the normalization doesn't work very well at all)
             DP_norm.append(dp/(1-min_s))
             #Update pbar
             pbar.update(1)
-    return pd.Series(DP, texts), pd.Series(DP_norm, texts)
+    return pd.Series(DP, words), pd.Series(DP_norm, words)
 
 #Function to get contextual diversity
 def getCD(v: dict) -> pd.Series:
@@ -301,7 +297,7 @@ def getCD(v: dict) -> pd.Series:
     #For each series attached to a book, look for a frequency list and gather all the words in a list
     for key in v:
         v_series = v[key]
-        word_series.append(list(v_series.index))
+        word_series.append([x[0] for x in v_series.index])
     #Add all words to a new series
     series = pd.Series(word_series)
     #Create series to count in how many books does a word appear in (explode the series comprised of lists)
@@ -341,8 +337,12 @@ def combineFrequencies(freq_data: dict) -> pd.Series:
         series.append(freq_data[key])
     #Concat all series together
     ser = pd.concat(series)
+    to_return = ser.groupby(ser.index).sum()
+    #Retain multi-indexes if used more than one column in getting frequency data
+    if type(to_return.index[0] == tuple):
+        to_return.index = pd.MultiIndex.from_tuples(to_return.index)
     #Return a series containing text as index and total freq in collection in the other
-    return ser.groupby(ser.index).sum()
+    return to_return
 
 
 #Functions to do with sub-corpora
@@ -388,7 +388,7 @@ def combineSubCorpDicts(corps: list) -> dict:
         whole.update(corps[i])
     return whole
 
-def combineSubCorpsData(corps: list):
+def combineSubCorpsData(corps: list, sum_together: bool):
     """
     Takes in a list of dataframes (or series) and combines them together
     """
@@ -396,10 +396,12 @@ def combineSubCorpsData(corps: list):
     for df in corps:
         dfs.append(df)
     combined = pd.concat(dfs)
-    if type(combined) is pd.DataFrame:
-        return combined.groupby(combined.columns[0])[combined.columns[1]].sum().reset_index()
-    else:
-        return combined.groupby(level=0).sum()
+    if sum_together:
+        if type(combined) is pd.DataFrame:
+            return combined.groupby(combined.columns[0])[combined.columns[1]].sum().reset_index()
+        else:
+            return combined.groupby(level=0).sum()
+    return combined
     
 
 def getTypeTokenRatios(v: dict, word_amounts: dict) -> pd.Series:
@@ -431,7 +433,7 @@ def getZipfValues(l: int, f: pd.Series) -> pd.Series:
     :param f: series containing frequency data of words/lemmas for the corpus
     :return: pd.Series, where indexes are words/lemmas and values the Zipf values
     """
-    indexes = list(f.index)
+    indexes = f.index
     types_per_mil = len(indexes)/1000000
     tokens_per_mil = l/1000000
     zipfs = f.values+1
@@ -756,7 +758,7 @@ def addAgeGroupSeparatorsToDF(df: pd.DataFrame) -> pd.DataFrame:
     df_2 = pd.concat([df_2.iloc[:two2three+1], row2, df_2.iloc[two2three+1:]])
     return df_2
 
-def combineSeriesForExcelWriter(f_lemmas, corpus, lemma_DP, lemma_CD, f_words, word_DP, word_CD):
+def combineSeriesForExcelWriter(f_lemmas, corpus, lemma_DP, lemma_CD, lemma_zipfs, f_words, word_DP, word_CD, word_zipfs, pos):
     """
     Helper function for combining various Series containing lemma/word data into compact dataframes
     """
@@ -820,6 +822,42 @@ def mapExactAgeToMean(corpus: dict[str,pd.DataFrame]) -> dict[str,pd.DataFrame]:
             new_key = key[:key.find('_')]+'_14_'+key[-1]
         df = corpus[key]
         returnable[new_key] = df
+    return returnable
+
+def getPosPhraseCounts(corpus: dict[str,pd.DataFrame], upos: str) -> dict[str,float]:
+    """
+    Function for calculating the number of POS phrases for each book in (sub)corpus.
+    Working POS-tags are those listed in the CoNLLU file format
+    """
+    returnable = {}
+    for key in corpus:
+        df = corpus[key]
+        returnable[key] = len(df[(df['upos'] == upos) & (df['deprel'] == 'root')])
+    return returnable
+
+def scaleCorpusData(corpus_data: dict[str,float], scaling_data: dict[str,float]):
+    """
+    Function for scaling some previously calculated data (e.g. word counts) with some other measure (e.g. number of sentences)
+    """
+    returnable = {}
+    for key in corpus_data:
+        returnable[key] = corpus_data[key]/scaling_data[key]
+    return returnable
+
+def getPosNGramForCorpus(corpus: dict[str,pd.DataFrame], n: int) -> dict[str, pd.Series]:
+    """
+    Function for getting wanted length POS n-gram for each book in corpus
+    """
+
+    returnable = {}
+    for key in corpus:
+        df = corpus[key]['upos']
+        n_grams = {}
+        for i in range(len(df)-(n-1)):
+            n_grams[i] = df.iloc[i:i+n].to_numpy(str)
+        for i in range(len(df)-(n-1), len(df)):
+            n_grams[i] = ""
+        returnable[key] = pd.Series(n_grams)
     return returnable
 
 #Writing all data into one big xlsx-file
