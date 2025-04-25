@@ -492,7 +492,7 @@ def cleanWordBeginnings(books: dict) -> dict:
     for key in books:
         df = books[key].copy()
         df['text'] = df['text'].apply(lambda x: delNonAlnumStart(str(x)))
-        clean[key] = df
+        clean[key] = df.dropna()
     return clean
 
 def delNonAlnumStart(x: str) -> str:
