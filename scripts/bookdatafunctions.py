@@ -252,7 +252,7 @@ def getAvgSentenceLens(books: dict) -> dict:
 #Function to calculate DP (deviation of proportions) of all the words in the corpus
 def getDP(v: dict, f_series: pd.Series, s: dict) -> tuple:
     """
-    Function which calculates the dispersion (DP) based on the formula by Greis
+    Function which calculates the dispersion (DP) based on the formula by Gries
     :v: dict of form [book_name, pd.Series], series has frequencies per book
     :f_df: pd.Series that includes the total frequencies of words/lemmas in the whole corpus
     :s: dict of form [book_name, ratio], where ratio is how much of the whole corpus a book takes
@@ -285,6 +285,59 @@ def getDP(v: dict, f_series: pd.Series, s: dict) -> tuple:
             #Update pbar
             pbar.update(1)
     return pd.Series(DP, words), pd.Series(DP_norm, words)
+
+#Function to calculate D (dispersion) of all the words in the corpus
+def getDispersion(v: dict, f_series: pd.Series) -> pd.Series:
+    """
+    Function which calculates the dispersion of a word in a (sub)corpus
+    :v: dict of form [book_name, pd.Series], series has frequencies per book
+    :f_df: pd.Series that includes the total frequencies of words/lemmas in the whole corpus
+    :return: pd.Series, with words/lemmas as indices and dispersions as values
+    """
+
+    words = [x[0] for x in f_series.index]
+    v_prepped = {key:pd.Series(data=np.multiply(v[key].to_numpy(), np.log(v[key].to_numpy())),index=v[key].index) for key in v}
+    corp_len = np.log(len(list(v.keys())))
+    D = []
+    with tqdm(range(len(f_series)), desc="D calculations") as pbar:
+        #Loop through every single word in the corpus
+        for word in words:
+            #Get the freq of the word in the whole corpus
+            f = f_series[word]
+            # D = [log(p) * sum(p_i*log(p_i))/p]/log(n)
+            #Calculate and append D
+            D.append((np.log(f) - (np.sum([v_prepped[key].get(word,0.0) for key in v]) / f))/corp_len)
+            #Update pbar
+            pbar.update(1)
+    return pd.Series(D, words)
+
+def getU(v: dict, f: pd.Series, D: pd.Series) -> pd.Series:
+    """
+    Function for calculating the Estimated frequency per 1 million words (U) for words/lemmas
+    """
+    corp_size = f.sum()
+    base_scaler = 1000000 / corp_size
+    words = [x[0] for x in f.index]
+    #To speed up calculations, prepare everything that we can with numpy operations before doing anything in a for-loop
+    #Here we calculate the f_min value for each word (frequency of word inside a book * total length of said book)
+    v_prepped = {key:pd.Series(data=np.multiply(v[key].to_numpy(), v[key].sum()),index=v[key].index) for key in v}
+    #Sum all f_mins together (essentailly flatten the dictionary)
+    f_mins = list(v_prepped.values())[0]
+    if len(v) != 1:
+        for i in range(1, len(v_prepped)):
+            f_mins = f_mins.add(list(v_prepped.values())[i], fill_value=0)
+    #Scale with 1/N as per formula
+    f_mins = f_mins * (1/corp_size)
+    #Calculate U-values for each word
+    U_data = [base_scaler * (f[word]*D.get(word, 0.0) + (1-D.get(word, 0.0)) * f_mins[word]) for word in words]
+    return pd.Series(U_data, index=words)
+
+def getSFI(U: pd.Series) -> pd.Series:
+    """
+    Function for calculating the Standardized Frequency Index (SFI) for the estimated frequency per 1 million words (U)
+    """
+    values = 10*(np.log10(U.to_numpy())+4)
+    return pd.Series(values, U.index)
 
 #Function to get contextual diversity
 def getCD(v: dict) -> pd.Series:
@@ -339,7 +392,7 @@ def combineFrequencies(freq_data: dict) -> pd.Series:
     ser = pd.concat(series)
     to_return = ser.groupby(ser.index).sum()
     #Retain multi-indexes if used more than one column in getting frequency data
-    if type(to_return.index[0] == tuple):
+    if type(to_return.index[0]) == tuple:
         to_return.index = pd.MultiIndex.from_tuples(to_return.index)
     #Return a series containing text as index and total freq in collection in the other
     return to_return
@@ -860,18 +913,246 @@ def getPosNGramForCorpus(corpus: dict[str,pd.DataFrame], n: int) -> dict[str, pd
         returnable[key] = pd.Series(n_grams)
     return returnable
 
-#Writing all data into one big xlsx-file
-def writeDataToXlsx(
-        name, 
-        lemmas,
-        words, 
-        pos_freqs
-        ):
+def formatDataForPaperOutput(corpus: dict[str,pd.DataFrame]):
     """
-    Write all wanted data to an xlsx file for testing purposes
+    Function which takes in a corpus and provides three sets of dictionaries as output:
+    1. contains data for exact ages as subcorpora
+    2. contains data for age groups as subcorpora
+    3. contains data for the whole corpus
     """
-    with pd.ExcelWriter("Data/"+name+".xlsx") as writer:
-        words.to_excel(writer, sheet_name="Word data")
-        lemmas.to_excel(writer, sheet_name="Lemma data")
-        pos_freqs.to_excel(writer, sheet_name="POS data")
-        #avg_lens.to_excel(writer, sheet_name="Average unique lengths data")
+    ages = sorted(getAvailableAges(corpus))
+
+    ready_dfs_ages = {}
+    ready_dfs_groups = {}
+    ready_dfs_whole = {}
+
+    #Subcorpora based on the target age groups
+    sub_corpora = []
+    #Combine books aged 15 and up into one sub-corpus as there are very few entries in 16,17,18
+    over_15 = []
+    for i in ages:
+        if i<15:
+            sub_corpora.append(cleanWordBeginnings(getDistinctSubCorp(corpus, i)))
+        else:
+            over_15.append(cleanWordBeginnings(getDistinctSubCorp(corpus, i)))
+    #Sort the aged 15 and over sub-corpora from lowest age to highest
+    over_15.sort(key=lambda x:int(findAgeFromID(list(x.keys())[0])))
+    #Combine 15+ aged books into one sub-corpus
+    sub_corpora.append(combineSubCorpDicts(over_15))
+    #Sort the sub-corpora from lowest age to highest
+    sub_corpora.sort(key=lambda x:int(findAgeFromID(list(x.keys())[0])))
+    #Keep track of when words and lemmas first appear in terms of intended reading age
+    word_age_appearances = {}
+    lemma_age_appearances = {}
+    #First sort out the subcorpora
+    for sub_corp in sub_corpora:
+        combined_data = pd.concat(sub_corp.values()).reset_index()
+        filtered_data = combined_data[['text','lemma','upos']]
+        filtered_data = filtered_data.drop_duplicates(['text','lemma','upos'], ignore_index=True)
+        #Add word-pos frequencies
+        v_words_pos = getColumnFrequencies(sub_corp, ['text','upos'])
+        word_pos_freqs = combineFrequencies(v_words_pos)
+        filtered_data['Word-POS F'] = [word_pos_freqs[x[0]][x[1]] for x in filtered_data[['text','upos']].to_numpy(dtype='str')]
+        #Add word frequencies
+        v_words = getColumnFrequencies(sub_corp, ['text'])
+        word_freqs = combineFrequencies(v_words)
+        filtered_data['Word F'] = [word_freqs[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word CD
+        word_CD = getCD(v_words)
+        filtered_data['Word CD'] = [word_CD[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word D
+        word_D = getDispersion(v_words, word_freqs)
+        filtered_data['Word D'] = [word_D[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word U
+        word_U = getU(v_words, word_freqs, word_D)
+        filtered_data['Word U'] = [word_U[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word SFI
+        word_SFI = getSFI(word_U)
+        filtered_data['Word SFI'] = [word_SFI[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word zipf-values
+        l = getL(getTokenAmounts(sub_corp))
+        word_zipfs = getZipfValues(l, word_freqs)
+        filtered_data['Word Zipf'] = [word_zipfs[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+
+
+        #Add lemma frequencies
+        v_lemmas = getColumnFrequencies(sub_corp, ['lemma'])
+        lemma_freqs = combineFrequencies(v_lemmas)
+        filtered_data['Lemma F'] = [lemma_freqs[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma CD
+        lemma_CD = getCD(v_lemmas)
+        filtered_data['Lemma CD'] = [lemma_CD[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma D
+        lemma_D = getDispersion(v_lemmas, lemma_freqs)
+        filtered_data['Lemma D'] = [lemma_D[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma U
+        lemma_U = getU(v_lemmas, lemma_freqs, lemma_D)
+        filtered_data['Lemma U'] = [lemma_U[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma SFI
+        lemma_SFI = getSFI(lemma_U)
+        filtered_data['Lemma SFI'] = [lemma_SFI[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma zipf-values
+        lemma_zipfs = getZipfValues(l, lemma_freqs)
+        filtered_data['Lemma Zipf'] = [lemma_zipfs[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add taivutusperhe size
+        tv_sizes = getTaivutusperheSize(sub_corp)
+        filtered_data['Lemma IFS'] = [tv_sizes[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        key = findAgeFromID(list(sub_corp.keys())[0])
+        #Slow but steady way of adding words and first appearance ages...
+        for w in word_freqs.index:
+            word_age_appearances.setdefault(w[0],key)
+        for le in lemma_freqs.index:
+            lemma_age_appearances.setdefault(le[0],key)
+        #Add first appearance
+        filtered_data['Word FSA'] = [word_age_appearances[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        filtered_data['Lemma FSA'] = [lemma_age_appearances[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add to dictionary
+        ready_dfs_ages[key] = filtered_data.sort_values('text')
+    
+    print("Exact ages done!")
+    #Define age group sub-corpora
+
+    
+    #Generate correct keys/ids
+    group_1 = [5,6,7,8]
+    group_2 = [9,10,11,12]
+    group_3 = ages[ages.index(13):]
+    #Distinct subcorpora
+    sub_corp_1= combineSubCorpDicts([getDistinctSubCorp(corpus, x) for x in group_1])
+    sub_corp_2= combineSubCorpDicts([getDistinctSubCorp(corpus, x) for x in group_2])
+    sub_corp_3= combineSubCorpDicts([getDistinctSubCorp(corpus, x) for x in group_3])
+    sub_corps = dict(zip(['7-8','9-12','13+'],[sub_corp_1, sub_corp_2, sub_corp_3]))
+
+    for s in sub_corps:
+        sub_corp = sub_corps[s]
+        combined_data = pd.concat(sub_corp.values()).reset_index()
+        filtered_data = combined_data[['text','lemma','upos']]
+        filtered_data = filtered_data.drop_duplicates(['text','lemma','upos'], ignore_index=True)
+        #Add word-pos frequencies
+        v_words_pos = getColumnFrequencies(sub_corp, ['text','upos'])
+        word_pos_freqs = combineFrequencies(v_words_pos)
+        filtered_data['Word-POS F'] = [word_pos_freqs[x[0]][x[1]] for x in filtered_data[['text','upos']].to_numpy(dtype='str')]
+        #Add word frequencies
+        v_words = getColumnFrequencies(sub_corp, ['text'])
+        word_freqs = combineFrequencies(v_words)
+        filtered_data['Word F'] = [word_freqs[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word CD
+        word_CD = getCD(v_words)
+        filtered_data['Word CD'] = [word_CD[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word D
+        word_D = getDispersion(v_words, word_freqs)
+        filtered_data['Word D'] = [word_D[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word U
+        word_U = getU(v_words, word_freqs, word_D)
+        filtered_data['Word U'] = [word_U[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word SFI
+        word_SFI = getSFI(word_U)
+        filtered_data['Word SFI'] = [word_SFI[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word zipf-values
+        l = getL(getTokenAmounts(sub_corp))
+        word_zipfs = getZipfValues(l, word_freqs)
+        filtered_data['Word Zipf'] = [word_zipfs[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+
+
+        #Add lemma frequencies
+        v_lemmas = getColumnFrequencies(sub_corp, ['lemma'])
+        lemma_freqs = combineFrequencies(v_lemmas)
+        filtered_data['Lemma F'] = [lemma_freqs[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma CD
+        lemma_CD = getCD(v_lemmas)
+        filtered_data['Lemma CD'] = [lemma_CD[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma D
+        lemma_D = getDispersion(v_lemmas, lemma_freqs)
+        filtered_data['Lemma D'] = [lemma_D[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma U
+        lemma_U = getU(v_lemmas, lemma_freqs, lemma_D)
+        filtered_data['Lemma U'] = [lemma_U[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma SFI
+        lemma_SFI = getSFI(lemma_U)
+        filtered_data['Lemma SFI'] = [lemma_SFI[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma zipf-values
+        lemma_zipfs = getZipfValues(l, lemma_freqs)
+        filtered_data['Lemma Zipf'] = [lemma_zipfs[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add taivutusperhe size
+        tv_sizes = getTaivutusperheSize(sub_corp)
+        filtered_data['Lemma IFS'] = [tv_sizes[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        key = s
+        #Add first appearance
+        filtered_data['Word FSA'] = [word_age_appearances[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        filtered_data['Lemma FSA'] = [lemma_age_appearances[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add to dictionary
+        ready_dfs_groups[key] = filtered_data.sort_values('text')
+
+    print("Age groups done!")
+
+    #Work with the whole corpus
+    combined_data = pd.concat(corpus.values()).reset_index()
+    filtered_data = combined_data[['text','lemma','upos']]
+    filtered_data = filtered_data.drop_duplicates(['text','lemma','upos'], ignore_index=True)
+    #Add word-pos frequencies
+    v_words_pos = getColumnFrequencies(corpus, ['text','upos'])
+    word_pos_freqs = combineFrequencies(v_words_pos)
+    filtered_data['Word-POS F'] = [word_pos_freqs[x[0]][x[1]] for x in filtered_data[['text','upos']].to_numpy(dtype='str')]
+    #Add word frequencies
+    v_words = getColumnFrequencies(corpus, ['text'])
+    word_freqs = combineFrequencies(v_words)
+    filtered_data['Word F'] = [word_freqs[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+    #Add word CD
+    word_CD = getCD(v_words)
+    filtered_data['Word CD'] = [word_CD[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+    #Add word D
+    word_D = getDispersion(v_words, word_freqs)
+    filtered_data['Word D'] = [word_D[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+    #Add word U
+    word_U = getU(v_words, word_freqs, word_D)
+    filtered_data['Word U'] = [word_U[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+    #Add word SFI
+    word_SFI = getSFI(word_U)
+    filtered_data['Word SFI'] = [word_SFI[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+    #Add word zipf-values
+    l = getL(getTokenAmounts(corpus))
+    word_zipfs = getZipfValues(l, word_freqs)
+    filtered_data['Word Zipf'] = [word_zipfs[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+
+
+    #Add lemma frequencies
+    v_lemmas = getColumnFrequencies(corpus, ['lemma'])
+    lemma_freqs = combineFrequencies(v_lemmas)
+    filtered_data['Lemma F'] = [lemma_freqs[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+    #Add lemma CD
+    lemma_CD = getCD(v_lemmas)
+    filtered_data['Lemma CD'] = [lemma_CD[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+    #Add lemma D
+    lemma_D = getDispersion(v_lemmas, lemma_freqs)
+    filtered_data['Lemma D'] = [lemma_D[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+    #Add lemma U
+    lemma_U = getU(v_lemmas, lemma_freqs, lemma_D)
+    filtered_data['Lemma U'] = [lemma_U[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+    #Add lemma SFI
+    lemma_SFI = getSFI(lemma_U)
+    filtered_data['Lemma SFI'] = [lemma_SFI[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+    #Add lemma zipf-values
+    lemma_zipfs = getZipfValues(l, lemma_freqs)
+    filtered_data['Lemma Zipf'] = [lemma_zipfs[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+    #Add taivutusperhe size
+    tv_sizes = getTaivutusperheSize(corpus)
+    filtered_data['Lemma IFS'] = [tv_sizes[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+    #Add first appearance
+    filtered_data['Word FSA'] = [word_age_appearances[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+    filtered_data['Lemma FSA'] = [lemma_age_appearances[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+    #Add to dictionary
+    ready_dfs_whole['Whole'] = filtered_data.sort_values('text')
+
+    print("Dataframes done!")
+
+    return ready_dfs_ages, ready_dfs_groups, ready_dfs_whole
+        
+def writePaperOutputAges(ready_dfs: dict[str:pd.DataFrame], name: str):
+    """
+    Simply function for writing xslx-files based on a list of dictionaries
+    Name is the name of the xlsx-file
+    """
+    with pd.ExcelWriter("Data/FCBLex_data_output_"+name+".xlsx") as writer:
+        for df in ready_dfs:
+            ready_dfs[df].to_excel(writer, sheet_name=df, index=False)
+            print(df+" done!")
