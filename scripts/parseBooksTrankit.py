@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 def main():
     """
-    Main function which looks for txt-files produced by Tesseract and parses them with Trankit
+    Main function which looks for txt-files and parses them with Trankit
     Outputs .json files with the name ISBN_age_register_parsed.json
     """
     #Setups

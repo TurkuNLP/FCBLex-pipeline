@@ -10,6 +10,18 @@ from scipy.stats import norm
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
+import itertools
+import string
+
+#CONSTANTS
+
+CONSONANTS = ['b','c','d','f','g','h','j','k','l','m','n','p','q','r','s','t','v','w','x','z']
+VOCALS = ['a','e','i','o','u','y','å','ä','ö']
+DIFTONGS_1 = ['ai','ei','oi','ui','yi','äi','öi','ey','iy','äy','öy','au','eu','iu','ou', 'aa', 'ee', 'ii', 'oo', 'uu', 'yy', 'ää', 'öö']
+DIFTONGS_2 = ['ie','uo','yö']
+SYLL_SET_1 = set(''.join(i) for i in itertools.product(CONSONANTS, VOCALS))
+SYLL_SET_2 = set(''.join(i) for i in itertools.product(VOCALS, VOCALS)) - set(DIFTONGS_1+DIFTONGS_2)
+SYLL_SET_3 = set(DIFTONGS_2)
 
 def initBooksFromJsons(json_path: str) -> dict:
     """
@@ -296,7 +308,8 @@ def getDispersion(v: dict, f_series: pd.Series) -> pd.Series:
     """
 
     words = [x[0] for x in f_series.index]
-    v_prepped = {key:pd.Series(data=np.multiply(v[key].to_numpy(), np.log(v[key].to_numpy())),index=v[key].index) for key in v}
+    #v_prepped = {key:pd.Series(data=np.multiply(v[key].to_numpy(), np.log(v[key].to_numpy())),index=v[key].index) for key in v}
+    mass_frame = pd.concat([pd.Series(data=np.multiply(v[key].to_numpy(), np.log(v[key].to_numpy())),index=v[key].index) for key in v]).groupby(level=0).sum().fillna(0)
     corp_len = np.log(len(list(v.keys())))
     D = []
     with tqdm(range(len(f_series)), desc="D calculations") as pbar:
@@ -306,7 +319,7 @@ def getDispersion(v: dict, f_series: pd.Series) -> pd.Series:
             f = f_series[word]
             # D = [log(p) * sum(p_i*log(p_i))/p]/log(n)
             #Calculate and append D
-            D.append((np.log(f) - (np.sum([v_prepped[key].get(word,0.0) for key in v]) / f))/corp_len)
+            D.append((np.log(f) - (mass_frame[word] / f))/corp_len)
             #Update pbar
             pbar.update(1)
     return pd.Series(D, words)
@@ -913,12 +926,58 @@ def getPosNGramForCorpus(corpus: dict[str,pd.DataFrame], n: int) -> dict[str, pd
         returnable[key] = pd.Series(n_grams)
     return returnable
 
+def countSyllablesFinnish(word: str) -> int:
+    """
+    Function for calculating syllables of words in Finnish.
+    Is not perfect, as cases like "Aie" will get marked as having one syllable instead of two, 
+    but these edge cases are very hard to code into rules and due to limited resources, have been left 'unfinished'
+    """
+    syll_count = 0
+    first_round_word = ""
+
+    word = str(word).capitalize()
+    #If more than one char AND does not start with punctuation/numerals
+    if len(word) > 1 and not word[0] in string.punctuation and not word[0].isnumeric():
+        temp_ind = 0
+        for i in range(1,len(word)):
+            bigram = word[i-1]+word[i]
+            #If consonant+vowel
+            if bigram in SYLL_SET_1:
+                first_round_word += word[temp_ind:i-1]+"#"
+                temp_ind = i-1
+        first_round_word += word[temp_ind:]
+    if first_round_word.count('#') > 0:
+        candidates = first_round_word.split('#')
+        for i in range(len(candidates)):
+            candidate = candidates[i]
+            if len(candidate) == 0:
+                continue
+            syll_count += 1
+            for j in range(1,len(candidate)):
+                bigram = candidate[j-1]+candidate[j]
+                #If not recognized diftong
+                if bigram in SYLL_SET_2:
+                    syll_count += 1
+                #If special diftong that counts as a syllable after the first syllable
+                if i!=0 and bigram in SYLL_SET_3:
+                    syll_count += 1
+    #If comprises of only one character and not punct/sym/num
+    elif not word[0] in string.punctuation and not word[0].isnumeric():
+        syll_count += 1
+    return syll_count
+
+def getSyllableAmountsForWords(words: pd.Series) -> None:
+    "Helper function to apply syllable counting to all words"
+    uniq_words = words.drop_duplicates()
+    return pd.Series(data=uniq_words.apply(countSyllablesFinnish).to_numpy(), index=uniq_words.to_numpy(dtype='str'))
+
 def formatDataForPaperOutput(corpus: dict[str,pd.DataFrame]):
     """
-    Function which takes in a corpus and provides three sets of dictionaries as output:
+    Function which takes in a corpus and provides three sets of dictionaries as sets of csv-files:
     1. contains data for exact ages as subcorpora
     2. contains data for age groups as subcorpora
-    3. contains data for the whole corpus
+    3. contains data for registers as subcorpora
+    4. contains data for the whole corpus
     """
     ages = sorted(getAvailableAges(corpus))
 
@@ -997,6 +1056,13 @@ def formatDataForPaperOutput(corpus: dict[str,pd.DataFrame]):
         #Add taivutusperhe size
         tv_sizes = getTaivutusperheSize(sub_corp)
         filtered_data['Lemma IFS'] = [tv_sizes[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add syllables per word
+        syllable_amount = getSyllableAmountsForWords(filtered_data['text'])
+        filtered_data['Word Syllables'] = [syllable_amount[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add length of word
+        filtered_data['Word Length'] = filtered_data['text'].str.len()
+        #Add length of lemma
+        filtered_data['Lemma Length']= filtered_data['lemma'].str.len()
         key = findAgeFromID(list(sub_corp.keys())[0])
         #Slow but steady way of adding words and first appearance ages...
         for w in word_freqs.index:
@@ -1010,6 +1076,9 @@ def formatDataForPaperOutput(corpus: dict[str,pd.DataFrame]):
         ready_dfs_ages[key] = filtered_data.sort_values('text')
     
     print("Exact ages done!")
+
+    writePaperOutputCsv(ready_dfs_ages, 'ages_csv')
+    print("Ages outputted!")
     #Define age group sub-corpora
 
     
@@ -1076,6 +1145,13 @@ def formatDataForPaperOutput(corpus: dict[str,pd.DataFrame]):
         #Add taivutusperhe size
         tv_sizes = getTaivutusperheSize(sub_corp)
         filtered_data['Lemma IFS'] = [tv_sizes[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add syllables per word
+        syllable_amount = getSyllableAmountsForWords(filtered_data['text'])
+        filtered_data['Word Syllables'] = [syllable_amount[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add length of word
+        filtered_data['Word Length'] = filtered_data['text'].str.len()
+        #Add length of lemma
+        filtered_data['Lemma Length']= filtered_data['lemma'].str.len()
         key = s
         #Add first appearance
         filtered_data['Word FSA'] = [word_age_appearances[x] for x in filtered_data['text'].to_numpy(dtype='str')]
@@ -1084,6 +1160,82 @@ def formatDataForPaperOutput(corpus: dict[str,pd.DataFrame]):
         ready_dfs_groups[key] = filtered_data.sort_values('text')
 
     print("Age groups done!")
+
+    writePaperOutputCsv(ready_dfs_groups, 'groups_csv')
+    print("Groups done!")
+
+    print("Start registers")
+    #Work with registers
+    reg1 = {key:corpus[key] for key in corpus if key[-1]=='1'}
+    reg2 = {key:corpus[key] for key in corpus if key[-1]=='2'}
+    reg3 = {key:corpus[key] for key in corpus if key[-1]=='3'}
+
+    ready_dfs_registers = {}
+
+    sub_corps = dict(zip(['Fiction','Nonfiction','Textbook'],[reg1, reg2, reg3]))
+    for s in sub_corps:
+        sub_corp = sub_corps[s]
+        combined_data = pd.concat(sub_corp.values()).reset_index()
+        filtered_data = combined_data[['text','lemma','upos']]
+        filtered_data = filtered_data.drop_duplicates(['text','lemma','upos'], ignore_index=True)
+        #Add word-pos frequencies
+        v_words_pos = getColumnFrequencies(sub_corp, ['text','upos'])
+        word_pos_freqs = combineFrequencies(v_words_pos)
+        filtered_data['Word-POS F'] = [word_pos_freqs[x[0]][x[1]] for x in filtered_data[['text','upos']].to_numpy(dtype='str')]
+        #Add word frequencies
+        v_words = getColumnFrequencies(sub_corp, ['text'])
+        word_freqs = combineFrequencies(v_words)
+        filtered_data['Word F'] = [word_freqs[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word CD
+        word_CD = getCD(v_words)
+        filtered_data['Word CD'] = [word_CD[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word D
+        word_D = getDispersion(v_words, word_freqs)
+        filtered_data['Word D'] = [word_D[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word U
+        word_U = getU(v_words, word_freqs, word_D)
+        filtered_data['Word U'] = [word_U[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word SFI
+        word_SFI = getSFI(word_U)
+        filtered_data['Word SFI'] = [word_SFI[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        #Add word zipf-values
+        l = getL(getTokenAmounts(sub_corp))
+        word_zipfs = getZipfValues(l, word_freqs)
+        filtered_data['Word Zipf'] = [word_zipfs[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+
+
+        #Add lemma frequencies
+        v_lemmas = getColumnFrequencies(sub_corp, ['lemma'])
+        lemma_freqs = combineFrequencies(v_lemmas)
+        filtered_data['Lemma F'] = [lemma_freqs[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma CD
+        lemma_CD = getCD(v_lemmas)
+        filtered_data['Lemma CD'] = [lemma_CD[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma D
+        lemma_D = getDispersion(v_lemmas, lemma_freqs)
+        filtered_data['Lemma D'] = [lemma_D[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma U
+        lemma_U = getU(v_lemmas, lemma_freqs, lemma_D)
+        filtered_data['Lemma U'] = [lemma_U[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma SFI
+        lemma_SFI = getSFI(lemma_U)
+        filtered_data['Lemma SFI'] = [lemma_SFI[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add lemma zipf-values
+        lemma_zipfs = getZipfValues(l, lemma_freqs)
+        filtered_data['Lemma Zipf'] = [lemma_zipfs[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add taivutusperhe size
+        tv_sizes = getTaivutusperheSize(sub_corp)
+        filtered_data['Lemma IFS'] = [tv_sizes[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        key = s
+        #Add first appearance
+        filtered_data['Word FSA'] = [word_age_appearances[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+        filtered_data['Lemma FSA'] = [lemma_age_appearances[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+        #Add to dictionary
+        ready_dfs_registers[key] = filtered_data.sort_values('text')
+
+
+    writePaperOutputCsv(ready_dfs_registers, 'registers_csv')
+    print("Registers done!")
 
     #Work with the whole corpus
     combined_data = pd.concat(corpus.values()).reset_index()
@@ -1137,22 +1289,43 @@ def formatDataForPaperOutput(corpus: dict[str,pd.DataFrame]):
     #Add taivutusperhe size
     tv_sizes = getTaivutusperheSize(corpus)
     filtered_data['Lemma IFS'] = [tv_sizes[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
+    #Add syllables per word
+    syllable_amount = getSyllableAmountsForWords(filtered_data['text'])
+    filtered_data['Word Syllables'] = [syllable_amount[x] for x in filtered_data['text'].to_numpy(dtype='str')]
+    #Add length of word
+    filtered_data['Word Length'] = filtered_data['text'].str.len()
+    #Add length of lemma
+    filtered_data['Lemma Length']= filtered_data['lemma'].str.len()
     #Add first appearance
     filtered_data['Word FSA'] = [word_age_appearances[x] for x in filtered_data['text'].to_numpy(dtype='str')]
     filtered_data['Lemma FSA'] = [lemma_age_appearances[x] for x in filtered_data['lemma'].to_numpy(dtype='str')]
     #Add to dictionary
     ready_dfs_whole['Whole'] = filtered_data.sort_values('text')
-
-    print("Dataframes done!")
-
-    return ready_dfs_ages, ready_dfs_groups, ready_dfs_whole
+    print("Whole done!")
+    writePaperOutputCsv(ready_dfs_whole, 'whole_csv')
+    
+    print("All done!!")
+    #return ready_dfs_ages, ready_dfs_groups, ready_dfs_registers, ready_dfs_whole
         
-def writePaperOutputAges(ready_dfs: dict[str:pd.DataFrame], name: str):
+def writePaperOutputXlsx(ready_dfs: dict[str:pd.DataFrame], name: str):
     """
-    Simply function for writing xslx-files based on a list of dictionaries
+    Simple function for writing xslx-files based on a list of dictionaries
     Name is the name of the xlsx-file
     """
-    with pd.ExcelWriter("Data/FCBLex_data_output_"+name+".xlsx") as writer:
+    with pd.ExcelWriter("Data/TCBLex_data_output_"+name+".xlsx") as writer:
         for df in ready_dfs:
-            ready_dfs[df].to_excel(writer, sheet_name=df, index=False)
+            ready_dfs[df].sort_values('Word-POS F', ascending=False).to_excel(writer, sheet_name=df, index=False)
             print(df+" done!")
+
+def writePaperOutputCsv(ready_dfs: dict[str:pd.DataFrame], name: str):
+    """
+    Simple function for writing csv-files based on a list of dictionaries
+    Name is the name of the folder containing the csv-files
+    """
+    path = "Data/"+name
+    if not os.path.exists(path):
+        os.mkdir(path)
+    for df in ready_dfs:
+        name = path+"/"+str(df)+".csv"
+        ready_dfs[df].sort_values('Word-POS F', ascending=False).to_csv(name, index=False, sep=';')
+        print(df+" done!")
